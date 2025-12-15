@@ -54,7 +54,7 @@ class FFmpegHandler:
         return None
     
     def get_video_info(self, video_path: str) -> dict:
-        """获取视频信息"""
+        """获取视频信息（简化版，用于获取时长）"""
         if not self.ffmpeg_path:
             return {}
         
@@ -87,6 +87,104 @@ class FFmpegHandler:
                 return json.loads(result.stdout)
         except Exception as e:
             print(f"获取视频信息失败: {e}")
+        
+        return {}
+    
+    def get_detailed_video_info(self, video_path: str) -> dict:
+        """获取详细的视频信息"""
+        if not self.ffmpeg_path:
+            return {}
+        
+        try:
+            ffprobe_path = self.ffmpeg_path.replace("ffmpeg", "ffprobe")
+            if not os.path.exists(ffprobe_path):
+                ffprobe_path = shutil.which("ffprobe")
+            
+            if not ffprobe_path:
+                return {}
+            
+            # 获取视频和音频流信息，以及格式信息
+            cmd = [
+                ffprobe_path,
+                "-v", "error",
+                "-show_entries", "stream=width,height,codec_name,codec_type,bit_rate,r_frame_rate,duration",
+                "-show_entries", "format=duration,size,bit_rate",
+                "-of", "json",
+                video_path
+            ]
+            
+            run_kwargs = {'capture_output': True, 'text': True, 'timeout': 10}
+            if sys.platform == 'win32':
+                run_kwargs['creationflags'] = CREATE_NO_WINDOW
+            result = subprocess.run(cmd, **run_kwargs)
+            
+            if result.returncode == 0:
+                import json
+                data = json.loads(result.stdout)
+                
+                info = {
+                    'file_path': video_path,
+                    'file_size': os.path.getsize(video_path) if os.path.exists(video_path) else 0
+                }
+                
+                # 解析流信息
+                if 'streams' in data:
+                    video_stream = None
+                    audio_stream = None
+                    
+                    for stream in data['streams']:
+                        if stream.get('codec_type') == 'video' and not video_stream:
+                            video_stream = stream
+                        elif stream.get('codec_type') == 'audio' and not audio_stream:
+                            audio_stream = stream
+                    
+                    # 视频信息
+                    if video_stream:
+                        info['width'] = int(video_stream.get('width', 0))
+                        info['height'] = int(video_stream.get('height', 0))
+                        info['video_codec'] = video_stream.get('codec_name', 'unknown')
+                        info['video_bitrate'] = int(video_stream.get('bit_rate', 0)) if video_stream.get('bit_rate') else 0
+                        
+                        # 帧率
+                        r_frame_rate = video_stream.get('r_frame_rate', '0/1')
+                        if '/' in r_frame_rate:
+                            num, den = map(int, r_frame_rate.split('/'))
+                            info['fps'] = num / den if den > 0 else 0
+                        else:
+                            info['fps'] = float(r_frame_rate) if r_frame_rate else 0
+                        
+                        # 视频时长
+                        info['video_duration'] = float(video_stream.get('duration', 0)) if video_stream.get('duration') else 0
+                    
+                    # 音频信息
+                    if audio_stream:
+                        info['audio_codec'] = audio_stream.get('codec_name', 'unknown')
+                        info['audio_bitrate'] = int(audio_stream.get('bit_rate', 0)) if audio_stream.get('bit_rate') else 0
+                        info['audio_duration'] = float(audio_stream.get('duration', 0)) if audio_stream.get('duration') else 0
+                
+                # 格式信息
+                if 'format' in data:
+                    format_info = data['format']
+                    info['format_duration'] = float(format_info.get('duration', 0)) if format_info.get('duration') else 0
+                    info['format_bitrate'] = int(format_info.get('bit_rate', 0)) if format_info.get('bit_rate') else 0
+                    info['format_size'] = int(format_info.get('size', 0)) if format_info.get('size') else 0
+                
+                # 计算每帧每10000像素点所用的bit数
+                if 'width' in info and 'height' in info and 'fps' in info and 'format_bitrate' in info:
+                    width = info['width']
+                    height = info['height']
+                    fps = info['fps']
+                    bitrate = info['format_bitrate']  # 总码率（bps）
+                    
+                    if width > 0 and height > 0 and fps > 0:
+                        pixels = width * height
+                        bits_per_frame = bitrate / fps if fps > 0 else 0
+                        bits_per_10000_pixels = (bits_per_frame / pixels * 10000) if pixels > 0 else 0
+                        info['bits_per_10000_pixels'] = bits_per_10000_pixels
+                
+                return info
+        except Exception as e:
+            print(f"获取详细视频信息失败: {e}")
         
         return {}
     
@@ -319,5 +417,4 @@ class FFmpegHandler:
                 except:
                     pass
             return False, f"编码异常: {str(e)}"
-
 

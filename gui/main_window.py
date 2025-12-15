@@ -6,14 +6,33 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QProgressBar, QLabel,
     QFileDialog, QMessageBox, QListWidgetItem, QGroupBox,
-    QTextEdit, QDialog
+    QTextEdit, QDialog, QTableWidget, QTableWidgetItem, QHeaderView
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QMimeData
+from PyQt5.QtWidgets import QTableWidgetItem
 from PyQt5.QtGui import QDragEnterEvent, QDropEvent
 from core.config_manager import ConfigManager
 from core.ffmpeg_handler import FFmpegHandler
 from core.file_processor import FileProcessor
 from gui.settings_dialog import SettingsDialog
+
+
+class NumericTableWidgetItem(QTableWidgetItem):
+    """支持数值排序的表格项"""
+    def __lt__(self, other):
+        # 优先使用UserRole中的数值进行排序
+        self_data = self.data(Qt.UserRole)
+        other_data = other.data(Qt.UserRole)
+        
+        # 如果UserRole有值，使用数值排序
+        if self_data is not None and other_data is not None:
+            try:
+                return float(self_data) < float(other_data)
+            except (ValueError, TypeError):
+                pass
+        
+        # 否则使用文本排序
+        return super().__lt__(other)
 
 
 class EncodeWorker(QThread):
@@ -64,9 +83,79 @@ class MainWindow(QMainWindow):
         self.file_processor = None
         self.encode_worker = None
         self.file_list = []  # 待编码文件列表
+        self.file_info_dict = {}  # 文件信息字典 {文件路径: 详细信息}
         self.init_ffmpeg()
         self.init_ui()
         self.load_output_dir()
+    
+    def format_duration(self, seconds: float) -> str:
+        """格式化时长"""
+        if seconds <= 0:
+            return "N/A"
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        else:
+            return f"{minutes:02d}:{secs:02d}"
+    
+    def load_table_settings(self):
+        """加载表格设置（列顺序和列宽）"""
+        column_order = self.config_manager.get("table_column_order", None)
+        column_widths = self.config_manager.get("table_column_widths", None)
+        
+        if column_order and isinstance(column_order, list) and len(column_order) == self.file_table.columnCount():
+            # 恢复列顺序（需要在所有列创建后执行）
+            # 这里先保存顺序，稍后在init_ui完成后应用
+            self._pending_column_order = column_order
+        else:
+            self._pending_column_order = None
+        
+        if column_widths and isinstance(column_widths, dict):
+            # 恢复列宽
+            for col_index_str, width in column_widths.items():
+                col_index = int(col_index_str)
+                if 0 <= col_index < self.file_table.columnCount():
+                    self.file_table.setColumnWidth(col_index, int(width))
+    
+    def apply_pending_column_order(self):
+        """应用待处理的列顺序"""
+        if hasattr(self, '_pending_column_order') and self._pending_column_order:
+            # column_order存储的是逻辑索引的顺序
+            # 需要将逻辑索引移动到对应的视觉位置
+            header = self.file_table.horizontalHeader()
+            for visual_pos, logical_index in enumerate(self._pending_column_order):
+                if visual_pos < self.file_table.columnCount() and logical_index < self.file_table.columnCount():
+                    current_visual = header.visualIndex(logical_index)
+                    if current_visual != visual_pos:
+                        header.moveSection(current_visual, visual_pos)
+    
+    def save_table_settings(self):
+        """保存表格设置（列顺序和列宽）"""
+        # 获取当前列顺序（逻辑索引的顺序）
+        column_order = []
+        for i in range(self.file_table.columnCount()):
+            logical_index = self.file_table.horizontalHeader().logicalIndex(i)
+            column_order.append(logical_index)
+        
+        # 获取当前列宽
+        column_widths = {}
+        for i in range(self.file_table.columnCount()):
+            column_widths[i] = self.file_table.columnWidth(i)
+        
+        # 保存到配置
+        self.config_manager.set("table_column_order", column_order)
+        self.config_manager.set("table_column_widths", column_widths)
+        self.config_manager.save_config()
+    
+    def on_column_moved(self, logical_index: int, old_visual_index: int, new_visual_index: int):
+        """列移动时的回调"""
+        self.save_table_settings()
+    
+    def on_column_resized(self, logical_index: int, old_size: int, new_size: int):
+        """列大小改变时的回调"""
+        self.save_table_settings()
     
     def init_ffmpeg(self):
         """初始化FFmpeg处理器"""
@@ -118,13 +207,54 @@ class MainWindow(QMainWindow):
         
         layout.addLayout(toolbar_layout)
         
-        # 文件列表
+        # 文件列表（使用表格显示详细信息）
         list_group = QGroupBox("待编码文件列表")
         list_layout = QVBoxLayout()
         
-        self.file_list_widget = QListWidget()
-        self.file_list_widget.setSelectionMode(QListWidget.ExtendedSelection)
-        list_layout.addWidget(self.file_list_widget)
+        self.file_table = QTableWidget()
+        self.file_table.setColumnCount(11)  # 增加总时长列
+        self.file_table.setHorizontalHeaderLabels([
+            "文件名", "分辨率", "码率", "帧率", "总时长", "视频编码", 
+            "文件大小", "音频编码", "音频码率", "每帧/10000像素bit数", "路径"
+        ])
+        self.file_table.horizontalHeader().setStretchLastSection(True)
+        self.file_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.file_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.file_table.setAlternatingRowColors(True)
+        # 启用表头排序
+        self.file_table.setSortingEnabled(True)
+        # 启用列拖曳
+        self.file_table.horizontalHeader().setSectionsMovable(True)
+        self.file_table.horizontalHeader().setDragDropMode(QHeaderView.InternalMove)
+        # 连接列移动信号，保存列顺序
+        self.file_table.horizontalHeader().sectionMoved.connect(self.on_column_moved)
+        self.file_table.horizontalHeader().sectionResized.connect(self.on_column_resized)
+        
+        # 加载保存的列顺序和列宽
+        self.load_table_settings()
+        
+        # 默认列宽（如果配置中没有）
+        default_widths = {
+            0: 200,  # 文件名
+            1: 100,  # 分辨率
+            2: 100,  # 码率
+            3: 80,   # 帧率
+            4: 100,  # 总时长
+            5: 100,  # 视频编码
+            6: 100,  # 文件大小
+            7: 100,  # 音频编码
+            8: 100,  # 音频码率
+            9: 150,  # 每帧/10000像素bit数
+        }
+        
+        # 应用列宽
+        for col, width in default_widths.items():
+            if self.file_table.columnWidth(col) == 100:  # 默认宽度，应用自定义宽度
+                self.file_table.setColumnWidth(col, width)
+        
+        self.file_table.setColumnHidden(10, True)  # 隐藏路径列
+        
+        list_layout.addWidget(self.file_table)
         
         list_group.setLayout(list_layout)
         layout.addWidget(list_group)
@@ -232,12 +362,12 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "提示", "未找到视频文件")
             return
         
-        # 添加到列表
+        # 添加到列表并获取详细信息
         for file_path in files:
             if file_path not in self.file_list:
                 self.file_list.append(file_path)
-                item = QListWidgetItem(file_path)
-                self.file_list_widget.addItem(item)
+                # 获取文件详细信息
+                self.add_file_to_table(file_path)
         
         self.log(f"添加了 {len(files)} 个文件")
     
@@ -260,16 +390,188 @@ class MainWindow(QMainWindow):
     
     def remove_selected(self):
         """移除选中的文件"""
-        selected_items = self.file_list_widget.selectedItems()
-        for item in selected_items:
-            row = self.file_list_widget.row(item)
-            self.file_list.pop(row)
-            self.file_list_widget.takeItem(row)
+        selected_rows = set()
+        for item in self.file_table.selectedItems():
+            selected_rows.add(item.row())
+        
+        # 从后往前删除，避免索引变化
+        for row in sorted(selected_rows, reverse=True):
+            if row < len(self.file_list):
+                file_path = self.file_list.pop(row)
+                if file_path in self.file_info_dict:
+                    del self.file_info_dict[file_path]
+                self.file_table.removeRow(row)
     
     def clear_list(self):
         """清空列表"""
         self.file_list.clear()
-        self.file_list_widget.clear()
+        self.file_info_dict.clear()
+        self.file_table.setRowCount(0)
+    
+    def format_file_size(self, size_bytes: int) -> str:
+        """格式化文件大小"""
+        if size_bytes == 0:
+            return "0 B"
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.2f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.2f} PB"
+    
+    def format_bitrate(self, bitrate: int) -> str:
+        """格式化码率（统一使用Mbps）"""
+        if bitrate == 0:
+            return "N/A"
+        # 统一转换为Mbps显示
+        mbps = bitrate / 1000000.0
+        if mbps < 0.01:
+            # 如果小于0.01 Mbps，显示Kbps
+            kbps = bitrate / 1000.0
+            return f"{kbps:.2f} Kbps"
+        else:
+            return f"{mbps:.2f} Mbps"
+    
+    def add_file_to_table(self, file_path: str):
+        """添加文件到表格并获取详细信息"""
+        row = self.file_table.rowCount()
+        self.file_table.insertRow(row)
+        
+        # 先显示基本信息
+        filename = os.path.basename(file_path)
+        filename_item = QTableWidgetItem(filename)
+        filename_item.setToolTip(filename)  # 设置tooltip显示完整文件名
+        self.file_table.setItem(row, 0, filename_item)
+        
+        # 为所有列设置初始tooltip
+        for col in range(1, 10):
+            item = NumericTableWidgetItem("获取中...") if col not in [5, 7] else QTableWidgetItem("获取中...")
+            item.setToolTip("获取中...")
+            self.file_table.setItem(row, col, item)
+        
+        path_item = QTableWidgetItem(file_path)
+        path_item.setToolTip(file_path)  # 路径列的完整tooltip
+        self.file_table.setItem(row, 10, path_item)
+        
+        # 异步获取详细信息
+        if self.ffmpeg_handler:
+            try:
+                info = self.ffmpeg_handler.get_detailed_video_info(file_path)
+                self.file_info_dict[file_path] = info
+                # 临时禁用排序，更新信息
+                self.file_table.setSortingEnabled(False)
+                self.update_file_info(row, file_path, info)
+                self.file_table.setSortingEnabled(True)
+            except Exception as e:
+                self.log(f"获取文件信息失败 {filename}: {str(e)}")
+                self.file_table.setSortingEnabled(False)
+                self.update_file_info(row, file_path, {})
+                self.file_table.setSortingEnabled(True)
+        else:
+            # 如果没有FFmpeg，至少显示文件大小
+            self.file_table.setSortingEnabled(False)
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            size_str = self.format_file_size(file_size)
+            size_item = NumericTableWidgetItem(size_str)
+            size_item.setData(Qt.UserRole, file_size)
+            size_item.setToolTip(size_str)  # 设置tooltip
+            self.file_table.setItem(row, 6, size_item)
+            self.update_file_info(row, file_path, {})
+            self.file_table.setSortingEnabled(True)
+    
+    def update_file_info(self, row: int, file_path: str, info: dict):
+        """更新文件信息到表格"""
+        if not info:
+            # 如果信息为空，显示N/A
+            for col in [1, 2, 3, 4, 8, 9]:
+                item = NumericTableWidgetItem("N/A")
+                item.setToolTip("N/A")
+                self.file_table.setItem(row, col, item)
+            for col in [5, 7]:
+                item = QTableWidgetItem("N/A")
+                item.setToolTip("N/A")
+                self.file_table.setItem(row, col, item)
+            # 至少显示文件大小
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            size_str = self.format_file_size(file_size)
+            size_item = NumericTableWidgetItem(size_str)
+            size_item.setData(Qt.UserRole, file_size)
+            size_item.setToolTip(size_str)
+            self.file_table.setItem(row, 6, size_item)
+            return
+        
+        # 分辨率 - 使用数字格式以便正确排序
+        width = info.get('width', 0)
+        height = info.get('height', 0)
+        resolution = f"{width}x{height}" if width > 0 and height > 0 else "N/A"
+        resolution_item = NumericTableWidgetItem(resolution)
+        resolution_item.setData(Qt.UserRole, width * height)  # 存储像素总数用于排序
+        resolution_item.setToolTip(resolution)  # 设置tooltip
+        self.file_table.setItem(row, 1, resolution_item)
+        
+        # 码率（总码率）- 存储原始数值用于排序
+        bitrate = info.get('format_bitrate', 0) or info.get('video_bitrate', 0)
+        bitrate_str = self.format_bitrate(bitrate)
+        bitrate_item = NumericTableWidgetItem(bitrate_str)
+        bitrate_item.setData(Qt.UserRole, bitrate)  # 存储原始码率值
+        bitrate_item.setToolTip(bitrate_str)  # 设置tooltip
+        self.file_table.setItem(row, 2, bitrate_item)
+        
+        # 帧率 - 存储原始数值用于排序
+        fps = info.get('fps', 0)
+        fps_str = f"{fps:.2f} fps" if fps > 0 else "N/A"
+        fps_item = NumericTableWidgetItem(fps_str)
+        fps_item.setData(Qt.UserRole, fps)  # 存储原始帧率值
+        fps_item.setToolTip(fps_str)  # 设置tooltip
+        self.file_table.setItem(row, 3, fps_item)
+        
+        # 总时长 - 存储原始秒数用于排序
+        duration = info.get('format_duration', 0) or info.get('video_duration', 0) or info.get('audio_duration', 0)
+        duration_str = self.format_duration(duration)
+        duration_item = NumericTableWidgetItem(duration_str)
+        duration_item.setData(Qt.UserRole, duration)  # 存储原始秒数
+        duration_item.setToolTip(duration_str)  # 设置tooltip
+        self.file_table.setItem(row, 4, duration_item)
+        
+        # 视频编码
+        video_codec = info.get('video_codec', 'N/A')
+        video_codec_item = QTableWidgetItem(video_codec)
+        video_codec_item.setToolTip(video_codec)  # 设置tooltip
+        self.file_table.setItem(row, 5, video_codec_item)
+        
+        # 文件大小 - 存储原始字节数用于排序
+        file_size = info.get('file_size', 0)
+        if file_size == 0:
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        size_str = self.format_file_size(file_size)
+        size_item = NumericTableWidgetItem(size_str)
+        size_item.setData(Qt.UserRole, file_size)  # 存储原始字节数
+        size_item.setToolTip(size_str)  # 设置tooltip
+        self.file_table.setItem(row, 6, size_item)
+        
+        # 音频编码
+        audio_codec = info.get('audio_codec', 'N/A')
+        audio_codec_item = QTableWidgetItem(audio_codec)
+        audio_codec_item.setToolTip(audio_codec)  # 设置tooltip
+        self.file_table.setItem(row, 7, audio_codec_item)
+        
+        # 音频码率 - 存储原始数值用于排序
+        audio_bitrate = info.get('audio_bitrate', 0)
+        audio_bitrate_str = self.format_bitrate(audio_bitrate)
+        audio_bitrate_item = NumericTableWidgetItem(audio_bitrate_str)
+        audio_bitrate_item.setData(Qt.UserRole, audio_bitrate)  # 存储原始音频码率值
+        audio_bitrate_item.setToolTip(audio_bitrate_str)  # 设置tooltip
+        self.file_table.setItem(row, 8, audio_bitrate_item)
+        
+        # 每帧每10000像素点所用的bit数 - 存储原始数值用于排序
+        bits_per_10000 = info.get('bits_per_10000_pixels', 0)
+        if bits_per_10000 > 0:
+            bits_str = f"{bits_per_10000:.2f} bits"
+        else:
+            bits_str = "N/A"
+        bits_item = NumericTableWidgetItem(bits_str)
+        bits_item.setData(Qt.UserRole, bits_per_10000)  # 存储原始值
+        bits_item.setToolTip(bits_str)  # 设置tooltip
+        self.file_table.setItem(row, 9, bits_item)
     
     def select_output_dir(self):
         """选择输出目录"""

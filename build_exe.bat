@@ -71,4 +71,3 @@ echo Executable: dist\VideoEncoder.exe
 echo.
 pause
 
-
