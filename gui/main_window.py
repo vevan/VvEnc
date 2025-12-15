@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QProgressBar, QLabel,
     QFileDialog, QMessageBox, QListWidgetItem, QGroupBox,
-    QTextEdit, QDialog, QTableWidget, QTableWidgetItem, QHeaderView
+    QTextEdit, QDialog, QTableWidget, QTableWidgetItem, QHeaderView, QMenu
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QMimeData
 from PyQt5.QtWidgets import QTableWidgetItem
@@ -15,6 +15,7 @@ from core.config_manager import ConfigManager
 from core.ffmpeg_handler import FFmpegHandler
 from core.file_processor import FileProcessor
 from gui.settings_dialog import SettingsDialog
+from translations import LanguageManager
 
 
 class NumericTableWidgetItem(QTableWidgetItem):
@@ -76,9 +77,10 @@ class EncodeWorker(QThread):
 class MainWindow(QMainWindow):
     """主窗口"""
     
-    def __init__(self):
+    def __init__(self, i18n_manager: LanguageManager = None):
         super().__init__()
         self.config_manager = ConfigManager()
+        self.i18n_manager = i18n_manager or LanguageManager()
         self.ffmpeg_handler = None
         self.file_processor = None
         self.encode_worker = None
@@ -87,6 +89,10 @@ class MainWindow(QMainWindow):
         self.init_ffmpeg()
         self.init_ui()
         self.load_output_dir()
+    
+    def tr(self, key: str, default: str = None) -> str:
+        """翻译函数"""
+        return self.i18n_manager.tr(key, default)
     
     def format_duration(self, seconds: float) -> str:
         """格式化时长"""
@@ -166,13 +172,13 @@ class MainWindow(QMainWindow):
         except FileNotFoundError as e:
             QMessageBox.warning(
                 self,
-                "FFmpeg未找到",
-                f"{str(e)}\n\n请在设置中指定FFmpeg路径。"
+                self.tr('MSG_FFMPEG_NOT_FOUND'),
+                f"{str(e)}\n\n" + self.tr('MSG_FFMPEG_NOT_INIT')
             )
     
     def init_ui(self):
         """初始化UI"""
-        self.setWindowTitle("批量视频编码工具")
+        self.setWindowTitle(self.tr('MAIN_WINDOW_TITLE'))
         self.setMinimumSize(800, 600)
         
         # 中央部件
@@ -183,39 +189,46 @@ class MainWindow(QMainWindow):
         # 工具栏
         toolbar_layout = QHBoxLayout()
         
-        self.add_files_btn = QPushButton("添加文件")
+        self.add_files_btn = QPushButton(self.tr('ADD_FILES'))
         self.add_files_btn.clicked.connect(self.add_files)
         toolbar_layout.addWidget(self.add_files_btn)
         
-        self.add_folder_btn = QPushButton("添加文件夹")
+        self.add_folder_btn = QPushButton(self.tr('ADD_FOLDER'))
         self.add_folder_btn.clicked.connect(self.add_folder)
         toolbar_layout.addWidget(self.add_folder_btn)
         
-        self.remove_btn = QPushButton("移除选中")
+        self.remove_btn = QPushButton(self.tr('REMOVE_SELECTED'))
         self.remove_btn.clicked.connect(self.remove_selected)
         toolbar_layout.addWidget(self.remove_btn)
         
-        self.clear_btn = QPushButton("清空列表")
+        self.clear_btn = QPushButton(self.tr('CLEAR_LIST'))
         self.clear_btn.clicked.connect(self.clear_list)
         toolbar_layout.addWidget(self.clear_btn)
         
         toolbar_layout.addStretch()
         
-        self.settings_btn = QPushButton("设置")
+        # 语言切换按钮（固定显示为"Language"）
+        self.language_btn = QPushButton("Language")
+        self.language_btn.clicked.connect(self.show_language_menu)
+        toolbar_layout.addWidget(self.language_btn)
+        
+        self.settings_btn = QPushButton(self.tr('SETTINGS'))
         self.settings_btn.clicked.connect(self.show_settings)
         toolbar_layout.addWidget(self.settings_btn)
         
         layout.addLayout(toolbar_layout)
         
         # 文件列表（使用表格显示详细信息）
-        list_group = QGroupBox("待编码文件列表")
+        list_group = QGroupBox(self.tr('FILE_LIST_TITLE'))
         list_layout = QVBoxLayout()
         
         self.file_table = QTableWidget()
         self.file_table.setColumnCount(11)  # 增加总时长列
         self.file_table.setHorizontalHeaderLabels([
-            "文件名", "分辨率", "码率", "帧率", "总时长", "视频编码", 
-            "文件大小", "音频编码", "音频码率", "每帧/10000像素bit数", "路径"
+            self.tr('COL_FILENAME'), self.tr('COL_RESOLUTION'), self.tr('COL_BITRATE'),
+            self.tr('COL_FRAMERATE'), self.tr('COL_DURATION'), self.tr('COL_VIDEO_CODEC'),
+            self.tr('COL_FILE_SIZE'), self.tr('COL_AUDIO_CODEC'), self.tr('COL_AUDIO_BITRATE'),
+            self.tr('COL_BITS_PER_PIXEL'), self.tr('COL_PATH')
         ])
         self.file_table.horizontalHeader().setStretchLastSection(True)
         self.file_table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -261,24 +274,24 @@ class MainWindow(QMainWindow):
         
         # 输出目录
         output_layout = QHBoxLayout()
-        output_layout.addWidget(QLabel("输出目录:"))
+        output_layout.addWidget(QLabel(self.tr('OUTPUT_DIR') + ":"))
         
-        self.output_dir_label = QLabel("未设置")
+        self.output_dir_label = QLabel(self.tr('OUTPUT_DIR_NOT_SET'))
         self.output_dir_label.setStyleSheet("color: gray;")
         output_layout.addWidget(self.output_dir_label)
         
-        self.output_dir_btn = QPushButton("选择输出目录")
+        self.output_dir_btn = QPushButton(self.tr('SELECT_OUTPUT_DIR'))
         self.output_dir_btn.clicked.connect(self.select_output_dir)
         output_layout.addWidget(self.output_dir_btn)
         
         layout.addLayout(output_layout)
         
         # 进度显示
-        progress_group = QGroupBox("编码进度")
+        progress_group = QGroupBox(self.tr('ENCODING_PROGRESS'))
         progress_layout = QVBoxLayout()
         
         # 总体进度
-        overall_label = QLabel("总体进度:")
+        overall_label = QLabel(self.tr('OVERALL_PROGRESS') + ":")
         progress_layout.addWidget(overall_label)
         
         self.overall_progress_bar = QProgressBar()
@@ -286,14 +299,14 @@ class MainWindow(QMainWindow):
         self.overall_progress_bar.setValue(0)
         progress_layout.addWidget(self.overall_progress_bar)
         
-        self.overall_progress_label = QLabel("等待开始...")
+        self.overall_progress_label = QLabel(self.tr('WAITING'))
         progress_layout.addWidget(self.overall_progress_label)
         
         # 分隔线
         progress_layout.addSpacing(10)
         
         # 当前文件进度
-        current_label = QLabel("当前文件进度:")
+        current_label = QLabel(self.tr('CURRENT_FILE_PROGRESS') + ":")
         progress_layout.addWidget(current_label)
         
         self.current_file_progress_bar = QProgressBar()
@@ -311,11 +324,11 @@ class MainWindow(QMainWindow):
         control_layout = QHBoxLayout()
         control_layout.addStretch()
         
-        self.start_btn = QPushButton("开始编码")
+        self.start_btn = QPushButton(self.tr('START_ENCODING'))
         self.start_btn.clicked.connect(self.start_encoding)
         control_layout.addWidget(self.start_btn)
         
-        self.stop_btn = QPushButton("停止")
+        self.stop_btn = QPushButton(self.tr('STOP'))
         self.stop_btn.clicked.connect(self.stop_encoding)
         self.stop_btn.setEnabled(False)
         control_layout.addWidget(self.stop_btn)
@@ -323,7 +336,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(control_layout)
         
         # 日志区域
-        log_group = QGroupBox("日志")
+        log_group = QGroupBox(self.tr('LOG_TITLE'))
         log_layout = QVBoxLayout()
         
         self.log_text = QTextEdit()
@@ -354,12 +367,12 @@ class MainWindow(QMainWindow):
     def add_path(self, path: str):
         """添加路径（文件或文件夹）"""
         if not self.file_processor:
-            QMessageBox.warning(self, "错误", "FFmpeg未初始化，请检查设置")
+            QMessageBox.warning(self, self.tr('MSG_ERROR'), self.tr('MSG_FFMPEG_NOT_INIT'))
             return
         
         files = self.file_processor.scan_files(path)
         if not files:
-            QMessageBox.information(self, "提示", "未找到视频文件")
+            QMessageBox.information(self, self.tr('MSG_INFO'), self.tr('MSG_NO_VIDEO_FILES'))
             return
         
         # 添加到列表并获取详细信息
@@ -369,22 +382,22 @@ class MainWindow(QMainWindow):
                 # 获取文件详细信息
                 self.add_file_to_table(file_path)
         
-        self.log(f"添加了 {len(files)} 个文件")
+        self.log(self.tr('LOG_FILES_ADDED').format(count=len(files)))
     
     def add_files(self):
         """添加文件"""
         files, _ = QFileDialog.getOpenFileNames(
             self,
-            "选择视频文件",
+            self.tr('SELECT_VIDEO_FILES'),
             "",
-            "视频文件 (*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.webm *.m4v *.3gp *.ts *.mts);;所有文件 (*.*)"
+            self.tr('VIDEO_FILES_FILTER')
         )
         for file_path in files:
             self.add_path(file_path)
     
     def add_folder(self):
         """添加文件夹"""
-        folder = QFileDialog.getExistingDirectory(self, "选择文件夹")
+        folder = QFileDialog.getExistingDirectory(self, self.tr('SELECT_FOLDER'))
         if folder:
             self.add_path(folder)
     
@@ -443,9 +456,10 @@ class MainWindow(QMainWindow):
         self.file_table.setItem(row, 0, filename_item)
         
         # 为所有列设置初始tooltip
+        fetching_text = self.tr('FETCHING_INFO')
         for col in range(1, 10):
-            item = NumericTableWidgetItem("获取中...") if col not in [5, 7] else QTableWidgetItem("获取中...")
-            item.setToolTip("获取中...")
+            item = NumericTableWidgetItem(fetching_text) if col not in [5, 7] else QTableWidgetItem(fetching_text)
+            item.setToolTip(fetching_text)
             self.file_table.setItem(row, col, item)
         
         path_item = QTableWidgetItem(file_path)
@@ -480,15 +494,16 @@ class MainWindow(QMainWindow):
     
     def update_file_info(self, row: int, file_path: str, info: dict):
         """更新文件信息到表格"""
+        na_text = self.tr('NA')
         if not info:
             # 如果信息为空，显示N/A
             for col in [1, 2, 3, 4, 8, 9]:
-                item = NumericTableWidgetItem("N/A")
-                item.setToolTip("N/A")
+                item = NumericTableWidgetItem(na_text)
+                item.setToolTip(na_text)
                 self.file_table.setItem(row, col, item)
             for col in [5, 7]:
-                item = QTableWidgetItem("N/A")
-                item.setToolTip("N/A")
+                item = QTableWidgetItem(na_text)
+                item.setToolTip(na_text)
                 self.file_table.setItem(row, col, item)
             # 至少显示文件大小
             file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
@@ -604,10 +619,13 @@ class MainWindow(QMainWindow):
         if output_dir:
             self.output_dir_label.setText(output_dir)
             self.output_dir_label.setStyleSheet("")
+        else:
+            self.output_dir_label.setText(self.tr('OUTPUT_DIR_NOT_SET'))
+            self.output_dir_label.setStyleSheet("color: gray;")
     
     def show_settings(self):
         """显示设置对话框"""
-        dialog = SettingsDialog(self.config_manager, self)
+        dialog = SettingsDialog(self.config_manager, self.i18n_manager, self)
         # 兼容不同Python版本的exec_()调用
         try:
             result = dialog.exec_()
@@ -621,23 +639,78 @@ class MainWindow(QMainWindow):
                 ffmpeg_path = self.config_manager.get("ffmpeg_path", "")
                 self.ffmpeg_handler = FFmpegHandler(ffmpeg_path if ffmpeg_path else "")
                 self.file_processor = FileProcessor(self.ffmpeg_handler)
-                self.log("FFmpeg设置已更新")
+                self.log(self.tr('LOG_FFMPEG_UPDATED'))
             except FileNotFoundError as e:
-                QMessageBox.warning(self, "错误", f"FFmpeg初始化失败: {str(e)}")
+                QMessageBox.warning(self, self.tr('MSG_ERROR'), f"{self.tr('MSG_FFMPEG_INIT_FAILED')}: {str(e)}")
+    
+    def show_language_menu(self):
+        """显示语言选择菜单"""
+        menu = QMenu(self)
+        languages = self.i18n_manager.get_available_languages()
+        current_lang = self.i18n_manager.get_current_language()
+        
+        for lang_code, lang_name in languages.items():
+            action = menu.addAction(lang_name)
+            action.setCheckable(True)
+            action.setChecked(lang_code == current_lang)
+            action.triggered.connect(lambda checked, code=lang_code: self.change_language(code))
+        
+        menu.exec_(self.language_btn.mapToGlobal(self.language_btn.rect().bottomLeft()))
+    
+    def change_language(self, lang_code: str):
+        """切换语言"""
+        if self.i18n_manager.set_language(lang_code):
+            self.config_manager.set("language", lang_code)
+            self.config_manager.save_config()
+            self.retranslate_ui()
+    
+    def retranslate_ui(self):
+        """重新翻译UI"""
+        self.setWindowTitle(self.tr('MAIN_WINDOW_TITLE'))
+        self.add_files_btn.setText(self.tr('ADD_FILES'))
+        self.add_folder_btn.setText(self.tr('ADD_FOLDER'))
+        self.remove_btn.setText(self.tr('REMOVE_SELECTED'))
+        self.clear_btn.setText(self.tr('CLEAR_LIST'))
+        self.language_btn.setText("Language")  # 固定显示为"Language"
+        self.settings_btn.setText(self.tr('SETTINGS'))
+        self.output_dir_btn.setText(self.tr('SELECT_OUTPUT_DIR'))
+        self.start_btn.setText(self.tr('START_ENCODING'))
+        self.stop_btn.setText(self.tr('STOP'))
+        
+        # 更新表格列标题
+        self.file_table.setHorizontalHeaderLabels([
+            self.tr('COL_FILENAME'), self.tr('COL_RESOLUTION'), self.tr('COL_BITRATE'),
+            self.tr('COL_FRAMERATE'), self.tr('COL_DURATION'), self.tr('COL_VIDEO_CODEC'),
+            self.tr('COL_FILE_SIZE'), self.tr('COL_AUDIO_CODEC'), self.tr('COL_AUDIO_BITRATE'),
+            self.tr('COL_BITS_PER_PIXEL'), self.tr('COL_PATH')
+        ])
+        
+        # 更新分组标题
+        for widget in self.findChildren(QGroupBox):
+            if widget.title() == "待编码文件列表" or widget.title() == "Files to Encode":
+                widget.setTitle(self.tr('FILE_LIST_TITLE'))
+            elif "编码进度" in widget.title() or "Encoding Progress" in widget.title():
+                widget.setTitle(self.tr('ENCODING_PROGRESS'))
+        
+        # 更新输出目录标签
+        if self.output_dir_label.text() == self.tr('OUTPUT_DIR_NOT_SET') or not self.config_manager.get("output_dir", ""):
+            self.output_dir_label.setText(self.tr('OUTPUT_DIR_NOT_SET'))
+        else:
+            self.output_dir_label.setText(self.config_manager.get("output_dir", ""))
     
     def start_encoding(self):
         """开始编码"""
         if not self.file_list:
-            QMessageBox.warning(self, "警告", "请先添加要编码的文件")
+            QMessageBox.warning(self, self.tr('MSG_WARNING'), self.tr('MSG_NO_FILES_ADDED'))
             return
         
         output_dir = self.config_manager.get("output_dir", "")
         if not output_dir:
-            QMessageBox.warning(self, "警告", "请先选择输出目录")
+            QMessageBox.warning(self, self.tr('MSG_WARNING'), self.tr('MSG_NO_OUTPUT_DIR'))
             return
         
         if not self.file_processor:
-            QMessageBox.warning(self, "错误", "FFmpeg未初始化")
+            QMessageBox.warning(self, self.tr('MSG_ERROR'), self.tr('MSG_FFMPEG_NOT_INIT'))
             return
         
         # 获取编码参数
@@ -670,30 +743,34 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(True)
         self.overall_progress_bar.setValue(0)
         self.current_file_progress_bar.setValue(0)
-        self.overall_progress_label.setText("准备开始...")
+        self.overall_progress_label.setText(self.tr('PREPARING'))
         self.current_file_label.setText("")
         
         # 启动编码
         self.encode_worker.start()
-        self.log(f"开始编码 {len(self.file_list)} 个文件")
+        self.log(self.tr('LOG_START_ENCODING').format(count=len(self.file_list)))
     
     def stop_encoding(self):
         """停止编码"""
         if self.encode_worker:
             self.encode_worker.cancel()
-            self.log("正在停止编码...")
+            self.log(self.tr('STOPPING'))
     
     def on_progress_updated(self, current: int, total: int, file_path: str, progress: float, message: str):
         """进度更新"""
         # 更新当前文件进度条
         self.current_file_progress_bar.setValue(int(progress))
-        self.current_file_label.setText(f"{os.path.basename(file_path)} - {message}")
+        self.current_file_label.setText(self.tr('CURRENT_FILE_FORMAT').format(
+            filename=os.path.basename(file_path), message=message
+        ))
         
         # 计算并更新总体进度条
         # 总体进度 = (已完成文件数 * 100 + 当前文件进度) / 总文件数
         overall_progress = ((current - 1) * 100 + progress) / total if total > 0 else 0
         self.overall_progress_bar.setValue(int(overall_progress))
-        self.overall_progress_label.setText(f"总体进度: {current}/{total} 个文件 ({int(overall_progress)}%)")
+        self.overall_progress_label.setText(self.tr('PROGRESS_FORMAT').format(
+            current=current, total=total, percent=int(overall_progress)
+        ))
     
     def on_encoding_finished(self, results: list):
         """编码完成"""
@@ -706,14 +783,16 @@ class MainWindow(QMainWindow):
         
         self.overall_progress_bar.setValue(100)
         self.current_file_progress_bar.setValue(100)
-        self.overall_progress_label.setText(f"编码完成: {success_count}/{total_count} 成功")
+        self.overall_progress_label.setText(self.tr('ENCODING_COMPLETE_FORMAT').format(
+            success=success_count, total=total_count
+        ))
         self.current_file_label.setText("")
         
         # 显示结果
         QMessageBox.information(
             self,
-            "编码完成",
-            f"编码完成！\n成功: {success_count}\n失败: {total_count - success_count}"
+            self.tr('MSG_ENCODING_COMPLETE'),
+            f"{self.tr('MSG_ENCODING_COMPLETE')}\n{self.tr('MSG_ENCODING_SUCCESS')}: {success_count}\n{self.tr('MSG_ENCODING_FAILED')}: {total_count - success_count}"
         )
         
         # 记录日志

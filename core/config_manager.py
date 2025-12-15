@@ -24,7 +24,8 @@ class ConfigManager:
             "subtitle_mode": "copy",  # "copy", "embed", "none"
             "custom_args": "",  # 自定义FFmpeg参数
             "use_custom_command": False,  # 是否使用自定义命令行
-            "custom_command_template": ""
+            "custom_command_template": "",
+            "language": "zh_CN"  # 语言设置
         }
         self.config = self.load_config()
     

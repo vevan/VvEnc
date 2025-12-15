@@ -56,7 +56,7 @@ echo Cleanup complete
 
 echo.
 echo [4/5] Building executable...
-python -m PyInstaller --name="VideoEncoder" --onefile --windowed %ICON_PARAM% --add-data "core;core" --add-data "gui;gui" --hidden-import=PyQt5.QtCore --hidden-import=PyQt5.QtGui --hidden-import=PyQt5.QtWidgets --collect-all PyQt5 --clean main.py
+python -m PyInstaller --name="VideoEncoder" --onefile --windowed %ICON_PARAM% --add-data "core;core" --add-data "gui;gui" --add-data "translations;translations" --hidden-import=PyQt5.QtCore --hidden-import=PyQt5.QtGui --hidden-import=PyQt5.QtWidgets --collect-all PyQt5 --clean main.py
 
 if errorlevel 1 (
     echo [ERROR] Build failed
