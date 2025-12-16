@@ -18,6 +18,7 @@ class Translations:
     # 檔案列表
     FILE_LIST_TITLE = "待編碼檔案列表"
     COL_FILENAME = "檔案名稱"
+    COL_STATUS = "狀態"
     COL_RESOLUTION = "解析度"
     COL_BITRATE = "碼率"
     COL_FRAMERATE = "幀率"
@@ -75,6 +76,21 @@ class Translations:
     LOG_FILES_ADDED = "添加了 {count} 個檔案"
     LOG_START_ENCODING = "開始編碼 {count} 個檔案"
     LOG_FFMPEG_UPDATED = "FFmpeg設定已更新"
+    LOG_FILE_STARTED = "開始編碼 {current}/{total}: {filename}"
+    LOG_FILE_FINISHED_SUCCESS = "完成 {current}/{total}: {filename} - {message}"
+    LOG_FILE_FINISHED_FAILED = "失敗 {current}/{total}: {filename} - {message}"
+    LOG_AUDIO_CODEC_AUTO_AAC = "檢測到音頻編碼與 MP4 容器可能不相容，已自動使用 AAC 編碼音頻（碼率 {bitrate}）"
+
+    # 大小總計
+    TOTAL_SIZE = "源檔案總大小：{size}"
+    TOTAL_SIZE_ENCODED = "源檔案總大小：{original}，編碼後總大小：{encoded}"
+
+    # 列表狀態
+    STATUS_WAITING = "等待編碼"
+    STATUS_ENCODING = "正在編碼"
+    STATUS_DONE = "編碼完成"
+    STATUS_FAILED = "編碼失敗"
+    STATUS_PAUSED = "掛起"
     
     # ========== 設定對話框 ==========
     SETTINGS_TITLE = "編碼設定"
@@ -160,6 +176,22 @@ class Translations:
         "  - 高質量: 256k-320k\n"
         "• 選擇'copy'時此參數無效"
     )
+    # 備用音頻編碼參數
+    FALLBACK_AUDIO_SETTINGS = "備用音頻編碼參數"
+    FALLBACK_AUDIO_CODEC = "備用音頻編碼器"
+    FALLBACK_AUDIO_CODEC_TOOLTIP = (
+        "當主音頻編碼設定為 copy 且與 MP4 容器不相容時，使用此編碼器重新編碼音頻：\n"
+        "• aac: 相容性好，質量高（推薦）\n"
+        "• opus: 壓縮率高，適合體積敏感場景\n"
+        "• mp3: 相容性最好"
+    )
+    FALLBACK_AUDIO_BITRATE = "備用音頻碼率"
+    FALLBACK_AUDIO_BITRATE_PLACEHOLDER = "例如: 192k"
+    FALLBACK_AUDIO_BITRATE_TOOLTIP = (
+        "備用音頻編碼時使用的碼率：\n"
+        "• 僅在主音頻編碼為 copy 且源音頻不能直接封裝到 MP4 時生效\n"
+        "• 不填寫時預設使用 192k"
+    )
     
     # 字幕設定
     SUBTITLE_SETTINGS = "字幕設定"
@@ -193,6 +225,14 @@ class Translations:
         "• 這些參數會追加到自動生成的FFmpeg命令末尾\n"
         "• 僅在未啟用自訂命令時有效"
     )
+    
+    # 提示音設定
+    NOTIFICATION_SETTINGS = "提示音設定"
+    ENABLE_NOTIFICATION_SOUND = "佇列完成後播放提示音"
+    NOTIFICATION_SOUND_FILE = "提示音檔案"
+    NOTIFICATION_SOUND_FILE_PLACEHOLDER = "選擇一個音訊檔（例如: wav, mp3）"
+    MSG_SELECT_SOUND_FILE = "選擇提示音音訊檔"
+    SOUND_FILES_FILTER = "音訊檔 (*.wav *.mp3 *.flac *.ogg *.m4a *.aac);;所有檔案 (*.*)"
     
     # 按鈕
     SAVE = "儲存"

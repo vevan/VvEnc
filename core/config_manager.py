@@ -21,6 +21,15 @@ class ConfigManager:
             "video_bit_depth": "8",  # "8", "10" 位深度
             "audio_codec": "copy",  # "copy"表示直接复制音频流
             "audio_bitrate": "",
+            # 备用音频编码参数：当主音频编码为 copy 且与 MP4 容器不兼容时使用
+            "fallback_audio_codec": "aac",   # 可选: aac / opus / mp3
+            "fallback_audio_bitrate": "192k",
+            # 窗口尺寸
+            "window_width": 1024,
+            "window_height": 720,
+            # 编码完成提示音
+            "notification_sound_enabled": False,
+            "notification_sound_file": "",
             "subtitle_mode": "copy",  # "copy", "embed", "none"
             "custom_args": "",  # 自定义FFmpeg参数
             "use_custom_command": False,  # 是否使用自定义命令行

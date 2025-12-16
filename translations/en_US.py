@@ -18,6 +18,7 @@ class Translations:
     # File list
     FILE_LIST_TITLE = "Files to Encode"
     COL_FILENAME = "Filename"
+    COL_STATUS = "Status"
     COL_RESOLUTION = "Resolution"
     COL_BITRATE = "Bitrate"
     COL_FRAMERATE = "Frame Rate"
@@ -75,6 +76,21 @@ class Translations:
     LOG_FILES_ADDED = "Added {count} files"
     LOG_START_ENCODING = "Starting encoding {count} files"
     LOG_FFMPEG_UPDATED = "FFmpeg settings updated"
+    LOG_FILE_STARTED = "Start encoding {current}/{total}: {filename}"
+    LOG_FILE_FINISHED_SUCCESS = "Finished {current}/{total}: {filename} - {message}"
+    LOG_FILE_FINISHED_FAILED = "Failed {current}/{total}: {filename} - {message}"
+    LOG_AUDIO_CODEC_AUTO_AAC = "Input audio codec may be incompatible with MP4 container, switched to AAC audio encoding ({bitrate}) automatically"
+
+    # Size summary
+    TOTAL_SIZE = "Original total size: {size}"
+    TOTAL_SIZE_ENCODED = "Original total size: {original}, Encoded total size: {encoded}"
+
+    # List item status
+    STATUS_WAITING = "Waiting"
+    STATUS_ENCODING = "Encoding"
+    STATUS_DONE = "Completed"
+    STATUS_FAILED = "Failed"
+    STATUS_PAUSED = "Paused"
     
     # ========== Settings Dialog ==========
     SETTINGS_TITLE = "Encoding Settings"
@@ -160,6 +176,23 @@ class Translations:
         "  - High quality: 256k-320k\n"
         "• This parameter is ignored when 'copy' is selected"
     )
+    # Fallback audio encoding
+    FALLBACK_AUDIO_SETTINGS = "Fallback Audio Encoding"
+    FALLBACK_AUDIO_CODEC = "Fallback Audio Codec"
+    FALLBACK_AUDIO_CODEC_TOOLTIP = (
+        "When the main audio codec is set to copy but the source audio cannot be muxed into MP4,\n"
+        "the audio will be re-encoded using this codec:\n"
+        "• aac: Good compatibility and quality (recommended)\n"
+        "• opus: High compression, suitable for size-sensitive scenarios\n"
+        "• mp3: Best compatibility"
+    )
+    FALLBACK_AUDIO_BITRATE = "Fallback Audio Bitrate"
+    FALLBACK_AUDIO_BITRATE_PLACEHOLDER = "e.g.: 192k"
+    FALLBACK_AUDIO_BITRATE_TOOLTIP = (
+        "Bitrate used when applying fallback audio encoding:\n"
+        "• Takes effect only when main codec is copy and source audio is incompatible with MP4\n"
+        "• If left empty, defaults to 192k"
+    )
     
     # Subtitle settings
     SUBTITLE_SETTINGS = "Subtitle Settings"
@@ -193,6 +226,14 @@ class Translations:
         "• These parameters will be appended to the end of the auto-generated FFmpeg command\n"
         "• Only effective when custom command is not enabled"
     )
+    
+    # Notification sound settings
+    NOTIFICATION_SETTINGS = "Notification Sound"
+    ENABLE_NOTIFICATION_SOUND = "Play sound when queue is finished"
+    NOTIFICATION_SOUND_FILE = "Sound File"
+    NOTIFICATION_SOUND_FILE_PLACEHOLDER = "Select an audio file (e.g.: wav, mp3)"
+    MSG_SELECT_SOUND_FILE = "Select notification sound file"
+    SOUND_FILES_FILTER = "Audio Files (*.wav *.mp3 *.flac *.ogg *.m4a *.aac);;All Files (*.*)"
     
     # Buttons
     SAVE = "Save"

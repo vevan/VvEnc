@@ -97,6 +97,7 @@ class SettingsDialog(QDialog):
         self.audio_codec_combo = QComboBox()
         self.audio_codec_combo.addItems(["copy", "aac", "mp3", "opus"])
         self.audio_codec_combo.setToolTip(self.tr('AUDIO_CODEC_TOOLTIP'))
+        self.audio_codec_combo.currentTextChanged.connect(self.on_audio_codec_changed)
         audio_layout.addRow(self.tr('AUDIO_CODEC') + ":", self.audio_codec_combo)
         
         self.audio_bitrate_edit = QLineEdit()
@@ -106,6 +107,42 @@ class SettingsDialog(QDialog):
         
         audio_group.setLayout(audio_layout)
         layout.addWidget(audio_group)
+
+        # 备用音频编码参数
+        self.fallback_audio_group = QGroupBox(self.tr('FALLBACK_AUDIO_SETTINGS'))
+        fallback_layout = QFormLayout()
+
+        self.fallback_audio_codec_combo = QComboBox()
+        self.fallback_audio_codec_combo.addItems(["aac", "opus", "mp3"])
+        self.fallback_audio_codec_combo.setToolTip(self.tr('FALLBACK_AUDIO_CODEC_TOOLTIP'))
+        fallback_layout.addRow(self.tr('FALLBACK_AUDIO_CODEC') + ":", self.fallback_audio_codec_combo)
+
+        self.fallback_audio_bitrate_edit = QLineEdit()
+        self.fallback_audio_bitrate_edit.setPlaceholderText(self.tr('FALLBACK_AUDIO_BITRATE_PLACEHOLDER'))
+        self.fallback_audio_bitrate_edit.setToolTip(self.tr('FALLBACK_AUDIO_BITRATE_TOOLTIP'))
+        fallback_layout.addRow(self.tr('FALLBACK_AUDIO_BITRATE') + ":", self.fallback_audio_bitrate_edit)
+
+        self.fallback_audio_group.setLayout(fallback_layout)
+        layout.addWidget(self.fallback_audio_group)
+
+        # 编码完成提示音
+        notify_group = QGroupBox(self.tr('NOTIFICATION_SETTINGS'))
+        notify_layout = QFormLayout()
+
+        self.notify_sound_check = QCheckBox(self.tr('ENABLE_NOTIFICATION_SOUND'))
+        notify_layout.addRow(self.notify_sound_check)
+
+        self.notify_sound_edit = QLineEdit()
+        self.notify_sound_edit.setPlaceholderText(self.tr('NOTIFICATION_SOUND_FILE_PLACEHOLDER'))
+        self.notify_sound_browse = QPushButton(self.tr('BROWSE'))
+        self.notify_sound_browse.clicked.connect(self.browse_notify_sound)
+        sound_path_layout = QHBoxLayout()
+        sound_path_layout.addWidget(self.notify_sound_edit)
+        sound_path_layout.addWidget(self.notify_sound_browse)
+        notify_layout.addRow(self.tr('NOTIFICATION_SOUND_FILE') + ":", sound_path_layout)
+
+        notify_group.setLayout(notify_layout)
+        layout.addWidget(notify_group)
         
         # 字幕设置
         subtitle_group = QGroupBox(self.tr('SUBTITLE_SETTINGS'))
@@ -180,6 +217,13 @@ class SettingsDialog(QDialog):
                 self.video_preset_combo.setCurrentText(current_preset)
             else:
                 self.video_preset_combo.setCurrentText("medium")
+
+    def on_audio_codec_changed(self, codec: str):
+        """音频编码器改变时，控制备用音频编码参数的可见性/可用性"""
+        # 只有当主音频编码选择为 copy 时，备用音频编码参数才有意义
+        enabled = (codec == "copy")
+        self.fallback_audio_group.setEnabled(enabled)
+        self.fallback_audio_group.setVisible(enabled)
     
     def browse_ffmpeg(self):
         """浏览FFmpeg路径"""
@@ -191,6 +235,17 @@ class SettingsDialog(QDialog):
         )
         if path:
             self.ffmpeg_path_edit.setText(path)
+
+    def browse_notify_sound(self):
+        """选择提示音文件"""
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            self.tr('MSG_SELECT_SOUND_FILE'),
+            "",
+            self.tr('SOUND_FILES_FILTER')
+        )
+        if path:
+            self.notify_sound_edit.setText(path)
     
     def load_settings(self):
         """加载设置"""
@@ -205,6 +260,12 @@ class SettingsDialog(QDialog):
         self.video_resolution_edit.setText(self.config_manager.get("video_resolution", ""))
         self.audio_codec_combo.setCurrentText(self.config_manager.get("audio_codec", "copy"))
         self.audio_bitrate_edit.setText(self.config_manager.get("audio_bitrate", ""))
+        self.fallback_audio_codec_combo.setCurrentText(self.config_manager.get("fallback_audio_codec", "aac"))
+        self.fallback_audio_bitrate_edit.setText(self.config_manager.get("fallback_audio_bitrate", "192k"))
+        # 根据当前音频编码设置更新备用参数区域状态
+        self.on_audio_codec_changed(self.audio_codec_combo.currentText())
+        self.notify_sound_check.setChecked(self.config_manager.get("notification_sound_enabled", False))
+        self.notify_sound_edit.setText(self.config_manager.get("notification_sound_file", ""))
         self.subtitle_combo.setCurrentText(self.config_manager.get("subtitle_mode", "copy"))
         self.use_custom_check.setChecked(self.config_manager.get("use_custom_command", False))
         self.custom_command_edit.setPlainText(self.config_manager.get("custom_command_template", ""))
@@ -229,6 +290,10 @@ class SettingsDialog(QDialog):
             "video_resolution": self.video_resolution_edit.text().strip(),
             "audio_codec": self.audio_codec_combo.currentText(),
             "audio_bitrate": self.audio_bitrate_edit.text().strip(),
+            "fallback_audio_codec": self.fallback_audio_codec_combo.currentText(),
+            "fallback_audio_bitrate": self.fallback_audio_bitrate_edit.text().strip(),
+            "notification_sound_enabled": self.notify_sound_check.isChecked(),
+            "notification_sound_file": self.notify_sound_edit.text().strip(),
             "subtitle_mode": self.subtitle_combo.currentText(),
             "use_custom_command": self.use_custom_check.isChecked(),
             "custom_command_template": self.custom_command_edit.toPlainText().strip(),

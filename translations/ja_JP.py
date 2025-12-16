@@ -18,6 +18,7 @@ class Translations:
     # ファイルリスト
     FILE_LIST_TITLE = "エンコード対象ファイル"
     COL_FILENAME = "ファイル名"
+    COL_STATUS = "状態"
     COL_RESOLUTION = "解像度"
     COL_BITRATE = "ビットレート"
     COL_FRAMERATE = "フレームレート"
@@ -75,6 +76,21 @@ class Translations:
     LOG_FILES_ADDED = "{count} 個のファイルを追加しました"
     LOG_START_ENCODING = "{count} 個のファイルのエンコードを開始します"
     LOG_FFMPEG_UPDATED = "FFmpeg設定を更新しました"
+    LOG_FILE_STARTED = "エンコード開始 {current}/{total}: {filename}"
+    LOG_FILE_FINISHED_SUCCESS = "エンコード完了 {current}/{total}: {filename} - {message}"
+    LOG_FILE_FINISHED_FAILED = "エンコード失敗 {current}/{total}: {filename} - {message}"
+    LOG_AUDIO_CODEC_AUTO_AAC = "入力音声コーデックがMP4コンテナと互換性がない可能性があるため、音声をAAC（{bitrate}）で自動変換しました"
+
+    # サイズ合計
+    TOTAL_SIZE = "元ファイル合計サイズ：{size}"
+    TOTAL_SIZE_ENCODED = "元ファイル合計サイズ：{original}、エンコード後合計サイズ：{encoded}"
+
+    # リスト状態
+    STATUS_WAITING = "エンコード待ち"
+    STATUS_ENCODING = "エンコード中"
+    STATUS_DONE = "エンコード完了"
+    STATUS_FAILED = "エンコード失敗"
+    STATUS_PAUSED = "一時停止"
     
     # ========== 設定ダイアログ ==========
     SETTINGS_TITLE = "エンコード設定"
@@ -160,6 +176,23 @@ class Translations:
         "  - 高品質: 256k-320k\n"
         "• 'copy'を選択した場合、このパラメータは無効"
     )
+    # フォールバック音声エンコード
+    FALLBACK_AUDIO_SETTINGS = "フォールバック音声エンコード"
+    FALLBACK_AUDIO_CODEC = "フォールバック音声コーデック"
+    FALLBACK_AUDIO_CODEC_TOOLTIP = (
+        "メインの音声コーデックが copy に設定されており、ソース音声が MP4 コンテナに\n"
+        "そのまま多重化できない場合、ここで指定したコーデックで再エンコードします：\n"
+        "• aac: 互換性と品質のバランスが良い（推奨）\n"
+        "• opus: 高圧縮率、サイズ重視の用途に適する\n"
+        "• mp3: 互換性が最も高い"
+    )
+    FALLBACK_AUDIO_BITRATE = "フォールバック音声ビットレート"
+    FALLBACK_AUDIO_BITRATE_PLACEHOLDER = "例: 192k"
+    FALLBACK_AUDIO_BITRATE_TOOLTIP = (
+        "フォールバック音声エンコードに使用するビットレート：\n"
+        "• メインコーデックが copy で、かつソース音声が MP4 と非互換な場合にのみ有効\n"
+        "• 未入力の場合、既定値 192k を使用"
+    )
     
     # 字幕設定
     SUBTITLE_SETTINGS = "字幕設定"
@@ -193,6 +226,14 @@ class Translations:
         "• これらのパラメータは自動生成されたFFmpegコマンドの末尾に追加されます\n"
         "• カスタムコマンドが有効でない場合のみ有効"
     )
+    
+    # 通知音設定
+    NOTIFICATION_SETTINGS = "通知音設定"
+    ENABLE_NOTIFICATION_SOUND = "キュー完了時に通知音を再生する"
+    NOTIFICATION_SOUND_FILE = "通知音ファイル"
+    NOTIFICATION_SOUND_FILE_PLACEHOLDER = "音声ファイルを選択（例: wav, mp3）"
+    MSG_SELECT_SOUND_FILE = "通知音の音声ファイルを選択"
+    SOUND_FILES_FILTER = "音声ファイル (*.wav *.mp3 *.flac *.ogg *.m4a *.aac);;すべてのファイル (*.*)"
     
     # ボタン
     SAVE = "保存"
