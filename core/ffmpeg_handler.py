@@ -364,7 +364,7 @@ class FFmpegHandler:
                                     process.kill()
                             except:
                                 pass
-                    return False, "编码已取消"
+                    return False, "Cancelled"
                 
                 line = process.stderr.readline()
                 if not line:
@@ -387,19 +387,19 @@ class FFmpegHandler:
                         if progress > last_progress:
                             last_progress = progress
                             if progress_callback:
-                                progress_callback(progress, f"编码中: {progress:.1f}%")
+                                progress_callback(progress, f"Encoding: {progress:.1f}%")
             
             process.wait()
             
             if process.returncode == 0:
                 if progress_callback:
-                    progress_callback(100.0, "编码完成")
-                return True, "编码成功"
+                    progress_callback(100.0, "Encoding finished")
+                return True, "Success"
             elif process.returncode == -15 or process.returncode == -9:  # SIGTERM 或 SIGKILL
-                return False, "编码已取消"
+                return False, "Cancelled"
             else:
-                error_msg = process.stderr.read() if process.stderr else "未知错误"
-                return False, f"编码失败: {error_msg}"
+                error_msg = process.stderr.read() if process.stderr else "Unknown error"
+                return False, f"Failed: {error_msg}"
         
         except KeyboardInterrupt:
             if process:
@@ -409,12 +409,12 @@ class FFmpegHandler:
                 except:
                     if process.poll() is None:
                         process.kill()
-            return False, "编码已中断"
+            return False, "Interrupted"
         except Exception as e:
             if process:
                 try:
                     process.terminate()
                 except:
                     pass
-            return False, f"编码异常: {str(e)}"
+            return False, f"Error: {str(e)}"
 
