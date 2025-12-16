@@ -229,20 +229,5 @@ It supports folder drag & drop, directory structure preserving, multi-language U
 
 ---
 
-### 8. 多语言切换 / Language Switching
-
-**中文：**
-
-- 窗口右上方有一个 **“Language”** 按钮：  
-  - 点击后选择 `简体中文 / 繁體中文 / English / 日本語`；  
-  - 绝大部分界面文字会立即更新，无需重启；  
-  - “Language” 按钮本身在所有语言下都显示为英文 “Language”。
-
-**English:**
-
-- On the top-right, click the **“Language”** button:  
-  - Choose among Simplified Chinese, Traditional Chinese, English, or Japanese;  
-  - Most UI texts update immediately without restarting;  
-  - The button label itself is always “Language” in all languages.
-
-
+中文使用说明请查看 `usage_cn.md`。  
+English usage guide please see `usage_en.md`.
