@@ -24,9 +24,11 @@ class ConfigManager:
             # 备用音频编码参数：当主音频编码为 copy 且与 MP4 容器不兼容时使用
             "fallback_audio_codec": "aac",   # 可选: aac / opus / mp3
             "fallback_audio_bitrate": "192k",
-            # 窗口尺寸
+            # 窗口尺寸与位置
             "window_width": 1024,
             "window_height": 720,
+            "window_pos_x": 0,
+            "window_pos_y": 0,
             # 编码完成提示音
             "notification_sound_enabled": False,
             "notification_sound_file": "",

@@ -351,12 +351,17 @@ class MainWindow(QMainWindow):
         """初始化UI"""
         self.setWindowTitle(self.tr('MAIN_WINDOW_TITLE'))
         self.setMinimumSize(800, 600)
-        # 恢复上次保存的窗口大小
+        # 恢复上次保存的窗口大小和位置
         try:
             width = int(self.config_manager.get("window_width", 0) or 0)
             height = int(self.config_manager.get("window_height", 0) or 0)
             if width > 0 and height > 0:
                 self.resize(width, height)
+            
+            pos_x = int(self.config_manager.get("window_pos_x", 0) or 0)
+            pos_y = int(self.config_manager.get("window_pos_y", 0) or 0)
+            if pos_x > 0 and pos_y > 0:
+                self.move(pos_x, pos_y)
         except Exception:
             pass
         
@@ -1441,11 +1446,14 @@ class MainWindow(QMainWindow):
                 pass
     
     def closeEvent(self, event):
-        """窗口关闭时保存窗口大小"""
+        """窗口关闭时保存窗口大小和位置"""
         try:
             size = self.size()
+            pos = self.pos()
             self.config_manager.set("window_width", size.width())
             self.config_manager.set("window_height", size.height())
+            self.config_manager.set("window_pos_x", pos.x())
+            self.config_manager.set("window_pos_y", pos.y())
             self.config_manager.save_config()
         except Exception:
             pass

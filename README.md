@@ -1,6 +1,7 @@
 # 批量视频编码工具 (Batch Video Encoder)
 
 基于 PyQt5 和 FFmpeg 的批量视频编码工具，支持拖放、批量处理、保留目录结构、多语言界面等功能。
+提示：此项目使用 AI 并在作者监督下完成，完全基于作者的个人需求开发，可以提需求但不一定采纳。
 
 [English README](docs/readme_en.md)
 
@@ -86,6 +87,14 @@
 - **窗口设置**：窗口大小、表格列宽和顺序
 - **其他设置**：语言、提示音、最后使用的目录等
 
+## 🔐 关于代码签名与安全提示
+
+- 当前项目发布的 Windows/macOS 可执行文件 **未进行代码签名**，属于“未知发布者”程序。
+- 在 Windows 上首次运行时，可能会触发 **SmartScreen 提示**（例如“Windows 已保护你的电脑”）：
+  - 请确认你是从本项目的官方发布页面获取的程序；
+  - 点击“更多信息”→“仍要运行”即可继续。
+- 本项目完全开源，源代码可在 GitHub 上自由查看和自行构建，如有安全疑虑，建议自行从源码编译后使用。
+
 ## 🛠️ 打包成可执行文件
 
 使用 `build_exe.bat` 可以将程序打包成独立的 Windows 可执行文件：
@@ -138,12 +147,16 @@ build_exe.bat
 
 ## 📄 许可证
 
-[添加许可证信息]
+本项目采用 **GNU 通用公共许可证（GPL）** 授权。
+
+- 你可以自由地使用、学习、修改和分发本项目，但分发的衍生作品也必须遵循 GPL 协议；
+- 详细条款请参考仓库根目录中的 [LICENSES](LICENSES) 文件或 GNU 官网。
 
 ## 🔗 相关链接
 
 - [FFmpeg 官网](https://ffmpeg.org/)
 - [PyQt5 文档](https://www.riverbankcomputing.com/static/Docs/PyQt5/)
+- [GNU 官网（GPL 协议）](https://www.gnu.org/licenses/gpl-3.0.html)
 
 ---
 
