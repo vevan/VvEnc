@@ -47,14 +47,35 @@ jobs:
           pip install pyinstaller
           pip install Pillow
       
-      - name: Convert icon (if needed)
+      - name: Convert icon (if needed) - Windows
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          if ((Test-Path icon.png) -and -not (Test-Path icon.ico)) {
+            python convert_icon.py
+          }
+        continue-on-error: true
+      
+      - name: Convert icon (if needed) - Linux/macOS
+        if: matrix.os != 'windows-latest'
+        shell: bash
         run: |
           if [ -f icon.png ] && [ ! -f icon.ico ]; then
             python convert_icon.py || true
           fi
         continue-on-error: true
       
-      - name: Clean old build files
+      - name: Clean old build files - Windows
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          if (Test-Path build) { Remove-Item -Recurse -Force build }
+          if (Test-Path dist) { Remove-Item -Recurse -Force dist }
+          if (Test-Path *.spec) { Remove-Item -Force *.spec }
+        continue-on-error: true
+      
+      - name: Clean old build files - Linux/macOS
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
           rm -rf build dist *.spec
@@ -64,33 +85,52 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
-          $iconParam = ""
+          $args = @(
+            "--name=VvEnc",
+            "--onefile",
+            "--windowed",
+            "--add-data", "core;core",
+            "--add-data", "gui;gui",
+            "--add-data", "translations;translations",
+            "--hidden-import=PyQt5.QtCore",
+            "--hidden-import=PyQt5.QtGui",
+            "--hidden-import=PyQt5.QtWidgets",
+            "--collect-all", "PyQt5",
+            "--clean",
+            "main.py"
+          )
+          
           if (Test-Path icon.ico) {
-            $iconParam = "--icon=icon.ico"
+            $args = @("--icon=icon.ico") + $args
+            $args = $args + @("--add-data", "icon.ico;.")
           }
           
-          $addData = "--add-data `"core;core`" --add-data `"gui;gui`" --add-data `"translations;translations`""
-          if (Test-Path icon.ico) {
-            $addData = "$addData --add-data `"icon.ico;.`""
-          }
-          
-          python -m PyInstaller --name="VvEnc" --onefile --windowed $iconParam $addData --hidden-import=PyQt5.QtCore --hidden-import=PyQt5.QtGui --hidden-import=PyQt5.QtWidgets --collect-all PyQt5 --clean main.py
+          python -m PyInstaller $args
       
       - name: Build executable (Linux/macOS)
         if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          ICON_PARAM=""
+          ARGS=(
+            "--name=VvEnc"
+            "--onefile"
+            "--add-data" "core:core"
+            "--add-data" "gui:gui"
+            "--add-data" "translations:translations"
+            "--hidden-import=PyQt5.QtCore"
+            "--hidden-import=PyQt5.QtGui"
+            "--hidden-import=PyQt5.QtWidgets"
+            "--collect-all" "PyQt5"
+            "--clean"
+            "main.py"
+          )
+          
           if [ -f icon.ico ]; then
-            ICON_PARAM="--icon=icon.ico"
+            ARGS=("--icon=icon.ico" "${ARGS[@]}")
+            ARGS=("${ARGS[@]}" "--add-data" "icon.ico:.")
           fi
           
-          ADD_DATA="--add-data 'core:core' --add-data 'gui:gui' --add-data 'translations:translations'"
-          if [ -f icon.ico ]; then
-            ADD_DATA="$ADD_DATA --add-data 'icon.ico:.'"
-          fi
-          
-          python -m PyInstaller --name="VvEnc" --onefile $ICON_PARAM $ADD_DATA --hidden-import=PyQt5.QtCore --hidden-import=PyQt5.QtGui --hidden-import=PyQt5.QtWidgets --collect-all PyQt5 --clean main.py
+          python -m PyInstaller "${ARGS[@]}"
       
       - name: Copy additional files
         shell: bash
