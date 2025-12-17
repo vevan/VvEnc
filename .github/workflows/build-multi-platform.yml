@@ -1,5 +1,9 @@
 name: Build Multi-Platform
 
+# 允许当前工作流使用 GITHUB_TOKEN 对 Release/contents 进行写操作
+permissions:
+  contents: write
+
 on:
   push:
     tags:
