@@ -4,23 +4,13 @@
 
 ## 📋 工作流文件
 
-### 1. `build.yml` - Windows 单平台构建
+### `build-multi-platform.yml` - 多平台构建
 
-**适用场景**：仅需要 Windows 版本时使用
+**功能**：同时构建 Windows、Linux、macOS 三个平台的可执行文件
 
 **触发条件**：
 - 推送以 `v` 开头的标签（如 `v1.0.0`）
 - 手动触发（在 GitHub Actions 页面点击 "Run workflow"）
-
-**输出**：
-- `VvEnc.exe` 可执行文件
-- `VvEnc-Windows-x64-{version}.zip` 压缩包
-
-### 2. `build-multi-platform.yml` - 多平台构建
-
-**适用场景**：需要同时构建 Windows、Linux、macOS 版本时使用
-
-**触发条件**：同上
 
 **输出**：
 - Windows: `VvEnc.exe` + `VvEnc-Windows-x64-{version}.zip`
@@ -49,7 +39,7 @@
 
 1. **进入 GitHub Actions 页面**：
    - 在仓库页面点击 "Actions" 标签
-   - 选择对应的工作流（`Build Executable` 或 `Build Multi-Platform`）
+   - 选择 `Build Multi-Platform` 工作流
 
 2. **手动运行**：
    - 点击 "Run workflow" 按钮
@@ -64,7 +54,7 @@
 ### Artifacts（构建产物）
 
 构建完成后，可以在 Actions 页面下载：
-- **名称**：`VvEnc-Windows-x64`（单平台）或 `VvEnc-{platform}`（多平台）
+- **名称**：`VvEnc-{platform}`（如 `VvEnc-windows-latest`、`VvEnc-ubuntu-latest`、`VvEnc-macos-latest`）
 - **内容**：
   - 可执行文件（`VvEnc.exe` 或 `VvEnc`）
   - 压缩包（包含可执行文件和额外文件）
@@ -92,7 +82,7 @@
 
 ### 自定义配置
 
-如需修改构建参数，编辑 `.github/workflows/build.yml` 或 `build-multi-platform.yml`：
+如需修改构建参数，编辑 `.github/workflows/build-multi-platform.yml`：
 
 - **Python 版本**：修改 `python-version: '3.11'`
 - **PyInstaller 参数**：修改 `Build executable` 步骤中的命令

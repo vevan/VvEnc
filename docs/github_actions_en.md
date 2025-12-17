@@ -4,23 +4,13 @@ This project provides GitHub Actions workflows to automatically build executable
 
 ## 📋 Workflow Files
 
-### 1. `build.yml` - Windows Single Platform Build
+### `build-multi-platform.yml` - Multi-Platform Build
 
-**Use Case**: When only Windows version is needed
+**Function**: Build executables for Windows, Linux, and macOS simultaneously
 
 **Triggers**:
 - Push tags starting with `v` (e.g., `v1.0.0`)
 - Manual trigger (click "Run workflow" in GitHub Actions page)
-
-**Outputs**:
-- `VvEnc.exe` executable
-- `VvEnc-Windows-x64-{version}.zip` archive
-
-### 2. `build-multi-platform.yml` - Multi-Platform Build
-
-**Use Case**: When Windows, Linux, and macOS versions are all needed
-
-**Triggers**: Same as above
 
 **Outputs**:
 - Windows: `VvEnc.exe` + `VvEnc-Windows-x64-{version}.zip`
@@ -49,7 +39,7 @@ This project provides GitHub Actions workflows to automatically build executable
 
 1. **Go to GitHub Actions page**:
    - Click "Actions" tab in the repository
-   - Select the workflow (`Build Executable` or `Build Multi-Platform`)
+   - Select the `Build Multi-Platform` workflow
 
 2. **Run manually**:
    - Click "Run workflow" button
@@ -64,7 +54,7 @@ This project provides GitHub Actions workflows to automatically build executable
 ### Artifacts
 
 After build completes, you can download from Actions page:
-- **Name**: `VvEnc-Windows-x64` (single platform) or `VvEnc-{platform}` (multi-platform)
+- **Name**: `VvEnc-{platform}` (e.g., `VvEnc-windows-latest`, `VvEnc-ubuntu-latest`, `VvEnc-macos-latest`)
 - **Contents**:
   - Executable file (`VvEnc.exe` or `VvEnc`)
   - Archive (contains executable and additional files)
@@ -92,7 +82,7 @@ When pushing a tag starting with `v`, it will automatically create a GitHub Rele
 
 ### Custom Configuration
 
-To modify build parameters, edit `.github/workflows/build.yml` or `build-multi-platform.yml`:
+To modify build parameters, edit `.github/workflows/build-multi-platform.yml`:
 
 - **Python Version**: Modify `python-version: '3.11'`
 - **PyInstaller Parameters**: Modify commands in `Build executable` step
