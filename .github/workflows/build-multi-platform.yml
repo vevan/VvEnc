@@ -193,9 +193,6 @@ jobs:
       - name: Copy additional files
         shell: bash
         run: |
-          if [ -f ringtone.mp3 ]; then
-            cp ringtone.mp3 dist/
-          fi
           if [ -f config.json ]; then
             cp config.json dist/
           fi

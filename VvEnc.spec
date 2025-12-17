@@ -1,23 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_submodules
 
-datas = [('core', 'core'), ('gui', 'gui'), ('translations', 'translations'), ('icon.ico', '.')]
-binaries = []
-hiddenimports = ['PyQt5.QtCore', 'PyQt5.QtGui', 'PyQt5.QtWidgets']
-tmp_ret = collect_all('PyQt5')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+hiddenimports = ['PyQt5.QtCore', 'PyQt5.QtGui', 'PyQt5.QtWidgets', 'PyQt5.QtMultimedia', 'PyQt5.QtWinExtras']
+hiddenimports += collect_submodules('PyQt5.QtCore')
+hiddenimports += collect_submodules('PyQt5.QtGui')
+hiddenimports += collect_submodules('PyQt5.QtWidgets')
+hiddenimports += collect_submodules('PyQt5.QtMultimedia')
 
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=binaries,
-    datas=datas,
+    binaries=[],
+    datas=[('core', 'core'), ('gui', 'gui'), ('translations', 'translations'), ('icon.ico', '.')],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['PyQt5.QtWebEngine', 'PyQt5.QtWebEngineWidgets', 'PyQt5.QtWebEngineCore', 'PyQt5.QtBluetooth', 'PyQt5.QtNfc', 'PyQt5.QtPositioning', 'PyQt5.QtLocation', 'PyQt5.QtSensors', 'PyQt5.QtSerialPort', 'PyQt5.QtQuick', 'PyQt5.QtQml', 'PyQt5.Qt3D', 'PyQt5.QtDesigner', 'PyQt5.QtHelp', 'PyQt5.QtSql', 'PyQt5.QtTest', 'PyQt5.QtXml', 'PyQt5.QtXmlPatterns', 'matplotlib', 'numpy', 'pandas', 'scipy', 'PIL', 'tkinter'],
     noarchive=False,
     optimize=0,
 )

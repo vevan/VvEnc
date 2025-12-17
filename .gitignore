@@ -33,6 +33,9 @@ wheels/
 # 配置文件（包含用户设置）
 config.json
 
+# 提示音（不纳入版本控制）
+ringtone.mp3
+
 # 日志文件
 *.log
 
