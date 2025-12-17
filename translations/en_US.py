@@ -46,10 +46,17 @@ class Translations:
     ENCODING_COMPLETE = "Encoding Complete"
     STOPPING = "Stopping encoding..."
     LOG_TITLE = "Log"
+    LOADING_FILES = "Loading..."
+    LOADING_FILES_INIT = "Loading file information..."
+    LOADING_FILES_PROGRESS = "Loading {current}/{total} files"
     
     # Control buttons
     START_ENCODING = "Start Encoding"
     STOP = "Stop"
+    
+    # Context menu
+    OPEN_SOURCE_FILE = "Open Source File"
+    REVEAL_SOURCE_FILE = "Reveal in Folder"
     
     # Message boxes
     MSG_ERROR = "Error"
@@ -66,6 +73,9 @@ class Translations:
     MSG_ENCODING_COMPLETE = "Encoding Complete!"
     MSG_ENCODING_SUCCESS = "Success"
     MSG_ENCODING_FAILED = "Failed"
+    MSG_FILE_NOT_FOUND = "File not found"
+    MSG_OPEN_FILE_FAILED = "Failed to open file: {error}"
+    MSG_REVEAL_FILE_FAILED = "Failed to reveal file: {error}"
     
     # File dialogs
     SELECT_VIDEO_FILES = "Select Video Files"

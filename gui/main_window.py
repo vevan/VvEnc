@@ -2,16 +2,27 @@
 主窗口 - 视频编码工具主界面
 """
 import os
+import sys
+import subprocess
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QListWidget, QProgressBar, QLabel,
-    QFileDialog, QMessageBox, QListWidgetItem, QGroupBox,
-    QTextEdit, QDialog, QTableWidget, QTableWidgetItem, QHeaderView, QMenu
+    QPushButton, QProgressBar, QLabel,
+    QFileDialog, QMessageBox, QGroupBox,
+    QTextEdit, QDialog, QTableWidget, QTableWidgetItem, QHeaderView, QMenu, QApplication
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QMimeData, QUrl
-from PyQt5.QtWidgets import QTableWidgetItem
-from PyQt5.QtGui import QDragEnterEvent, QDropEvent, QColor, QBrush
+from PyQt5.QtGui import QDragEnterEvent, QDropEvent, QColor, QBrush, QIcon
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+
+# Windows 任务栏进度条支持（仅 Windows）
+if sys.platform == 'win32':
+    try:
+        from PyQt5.QtWinExtras import QWinTaskbarButton, QWinTaskbarProgress
+        HAS_WIN_TASKBAR = True
+    except ImportError:
+        HAS_WIN_TASKBAR = False
+else:
+    HAS_WIN_TASKBAR = False
 from core.config_manager import ConfigManager
 from core.ffmpeg_handler import FFmpegHandler
 from core.file_processor import FileProcessor
@@ -78,6 +89,84 @@ STATUS_BG_COLORS = {
 }
 
 
+class FileInfoWorker(QThread):
+    """文件信息获取工作线程"""
+    progress_updated = pyqtSignal(int, int, str)  # current, total, file_path
+    file_info_ready = pyqtSignal(str, dict)  # file_path, info
+    finished = pyqtSignal()
+    
+    def __init__(self, ffmpeg_handler, files: list):
+        super().__init__()
+        self.ffmpeg_handler = ffmpeg_handler
+        self.files = files
+        self.cancelled = False
+    
+    def run(self):
+        """获取文件信息"""
+        total = len(self.files)
+        for current, file_path in enumerate(self.files, 1):
+            if self.cancelled:
+                break
+            self.progress_updated.emit(current, total, file_path)
+            
+            if self.ffmpeg_handler:
+                try:
+                    info = self.ffmpeg_handler.get_detailed_video_info(file_path)
+                    self.file_info_ready.emit(file_path, info)
+                except Exception:
+                    self.file_info_ready.emit(file_path, {})
+            else:
+                self.file_info_ready.emit(file_path, {})
+        
+        self.finished.emit()
+    
+    def cancel(self):
+        """取消获取"""
+        self.cancelled = True
+
+
+class LoadingDialog(QDialog):
+    """加载对话框"""
+    def __init__(self, parent=None, tr_func=None):
+        super().__init__(parent)
+        self.tr_func = tr_func or (lambda key, default=None: default or key)
+        self.setWindowTitle(self.tr_func('LOADING_FILES', '加载中...'))
+        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+        self.setModal(True)
+        
+        # 根据父窗口大小设置对话框大小
+        if parent:
+            parent_width = parent.width()
+            dialog_width = int(parent_width * 0.8)
+            # 高度大约5行：标签（2行）+ 进度条 + 间距
+            font_metrics = self.fontMetrics()
+            line_height = font_metrics.lineSpacing()
+            dialog_height = line_height * 5 + 40  # 5行高度 + 边距
+            self.setFixedSize(dialog_width, dialog_height)
+        else:
+            # 如果没有父窗口，使用默认大小
+            self.setFixedSize(400, 150)
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        self.label = QLabel(self.tr_func('LOADING_FILES_INIT', '正在载入文件信息...'))
+        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setWordWrap(True)  # 允许文本换行
+        layout.addWidget(self.label)
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)  # 不确定进度模式
+        layout.addWidget(self.progress_bar)
+    
+    def update_progress(self, current: int, total: int, file_path: str = ""):
+        """更新进度"""
+        filename = os.path.basename(file_path) if file_path else ""
+        loading_text = self.tr_func('LOADING_FILES_PROGRESS', '正在载入 {current}/{total} 文件')
+        self.label.setText(f"{loading_text.format(current=current, total=total)}\n{filename}")
+        self.progress_bar.setRange(0, total)
+        self.progress_bar.setValue(current)
+
+
 class EncodeWorker(QThread):
     """编码工作线程"""
     progress_updated = pyqtSignal(int, int, str, float, str)  # current, total, file, progress, message
@@ -107,11 +196,8 @@ class EncodeWorker(QThread):
             per_file_options=self.per_file_options,
             **self.encode_kwargs
         )
-        if not self.cancelled:
-            self.finished.emit(results)
-        else:
-            # 即使取消也发送结果
-            self.finished.emit(results)
+        # 发送结果（无论是否取消都发送）
+        self.finished.emit(results)
     
     def on_file_started(self, current: int, total: int, file_path: str):
         """文件开始编码回调"""
@@ -147,8 +233,30 @@ class MainWindow(QMainWindow):
         self.file_info_dict = {}  # 文件信息字典 {文件路径: 详细信息}
         self.file_status = {}  # 文件状态 {文件路径: 状态代码}
         self._last_encoded_total_size = None  # 最近一次编码后的总大小（字节），用于语言切换时刷新显示
-        # 编码完成提示音播放器
-        self.notification_player = QMediaPlayer(self)
+        self.file_info_worker = None  # 文件信息获取工作线程
+        self.loading_dialog = None  # 加载对话框
+        
+        # 设置窗口图标（窗口左上角图标）
+        # 处理 PyInstaller 打包后的路径
+        if getattr(sys, 'frozen', False):
+            # 打包后的可执行文件：从临时目录读取
+            base_path = sys._MEIPASS
+        else:
+            # 开发环境
+            base_path = os.path.dirname(os.path.dirname(__file__))
+        
+        icon_path = os.path.join(base_path, "icon.ico")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
+        # 初始化 Windows 任务栏进度条（仅 Windows）
+        if HAS_WIN_TASKBAR:
+            self.taskbar_button = QWinTaskbarButton(self)
+            self.taskbar_progress = self.taskbar_button.progress()
+            self.taskbar_progress.setMaximum(100)
+            self.taskbar_progress.setValue(0)
+            self.taskbar_progress.setVisible(False)
+        
         self.init_ffmpeg()
         self.init_ui()
         self.load_output_dir()
@@ -468,23 +576,125 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, self.tr('MSG_INFO'), self.tr('MSG_NO_VIDEO_FILES'))
             return
         
-        # 添加到列表并获取详细信息，初始状态为等待编码
-        for file_path in files:
-            if file_path not in self.file_list:
-                self.file_list.append(file_path)
-                self.file_status[file_path] = STATUS_WAITING
-                # 获取文件详细信息
-                self.add_file_to_table(file_path)
+        # 过滤掉已存在的文件
+        new_files = [f for f in files if f not in self.file_list]
+        if not new_files:
+            return
+        
+        # 添加到列表，初始状态为等待编码
+        for file_path in new_files:
+            self.file_list.append(file_path)
+            self.file_status[file_path] = STATUS_WAITING
+            # 先添加到表格（显示基本信息）
+            self.add_file_to_table(file_path)
+        
+        # 如果文件数量较多，使用异步加载并显示进度对话框
+        if len(new_files) > 5:
+            self._load_file_info_async(new_files)
+        else:
+            # 文件数量少，直接同步加载
+            for file_path in new_files:
+                self._load_single_file_info(file_path)
+                # 处理事件，保持界面响应
+                QApplication.processEvents()
+        
+        # 记录最后一个文件的目录路径到配置
+        if new_files:
+            last_file_path = new_files[-1]
+            last_file_dir = os.path.dirname(last_file_path)
+            if last_file_dir and os.path.exists(last_file_dir):
+                self.config_manager.set("last_file_dir", last_file_dir)
+                self.config_manager.save_config()
         
         self.update_total_size_display()
-        self.log(self.tr('LOG_FILES_ADDED').format(count=len(files)))
+        self.log(self.tr('LOG_FILES_ADDED').format(count=len(new_files)))
+    
+    def _load_file_info_async(self, files: list):
+        """异步加载文件信息（显示进度对话框）"""
+        # 创建并显示加载对话框
+        self.loading_dialog = LoadingDialog(self, tr_func=self.tr)
+        
+        # 创建工作线程
+        self.file_info_worker = FileInfoWorker(self.ffmpeg_handler, files)
+        self.file_info_worker.progress_updated.connect(self._on_file_info_progress)
+        self.file_info_worker.file_info_ready.connect(self._on_file_info_ready)
+        self.file_info_worker.finished.connect(self._on_file_info_finished)
+        
+        # 显示对话框并启动线程
+        self.loading_dialog.show()
+        self.file_info_worker.start()
+    
+    def _load_single_file_info(self, file_path: str):
+        """同步加载单个文件信息"""
+        row = self._find_file_row(file_path)
+        if row < 0:
+            return
+        
+        if self.ffmpeg_handler:
+            try:
+                info = self.ffmpeg_handler.get_detailed_video_info(file_path)
+                self.file_info_dict[file_path] = info
+                self.file_table.setSortingEnabled(False)
+                self.update_file_info(row, file_path, info)
+                self.file_table.setSortingEnabled(True)
+            except Exception as e:
+                filename = os.path.basename(file_path)
+                self.log(f"获取文件信息失败 {filename}: {str(e)}")
+                self.file_table.setSortingEnabled(False)
+                self.update_file_info(row, file_path, {})
+                self.file_table.setSortingEnabled(True)
+        else:
+            # 如果没有FFmpeg，至少显示文件大小
+            self.file_table.setSortingEnabled(False)
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            size_str = self.format_file_size(file_size)
+            size_item = NumericTableWidgetItem(size_str)
+            size_item.setData(Qt.UserRole, file_size)
+            size_item.setToolTip(size_str)
+            self.file_table.setItem(row, COL_FILE_SIZE, size_item)
+            self.update_file_info(row, file_path, {})
+            self.file_table.setSortingEnabled(True)
+    
+    def _find_file_row(self, file_path: str) -> int:
+        """查找文件在表格中的行号"""
+        for row in range(self.file_table.rowCount()):
+            path_item = self.file_table.item(row, COL_PATH)
+            if path_item and path_item.text() == file_path:
+                return row
+        return -1
+    
+    def _on_file_info_progress(self, current: int, total: int, file_path: str):
+        """文件信息获取进度更新"""
+        if self.loading_dialog:
+            self.loading_dialog.update_progress(current, total, file_path)
+    
+    def _on_file_info_ready(self, file_path: str, info: dict):
+        """单个文件信息获取完成"""
+        self.file_info_dict[file_path] = info
+        row = self._find_file_row(file_path)
+        if row >= 0:
+            self.file_table.setSortingEnabled(False)
+            self.update_file_info(row, file_path, info)
+            self.file_table.setSortingEnabled(True)
+    
+    def _on_file_info_finished(self):
+        """所有文件信息获取完成"""
+        if self.loading_dialog:
+            self.loading_dialog.close()
+            self.loading_dialog = None
+        self.file_info_worker = None
     
     def add_files(self):
         """添加文件"""
+        # 获取上次保存的目录路径
+        last_dir = self.config_manager.get("last_file_dir", "")
+        if not last_dir or not os.path.exists(last_dir):
+            last_dir = ""
+        
         files, _ = QFileDialog.getOpenFileNames(
             self,
             self.tr('SELECT_VIDEO_FILES'),
-            "",
+            last_dir,
             self.tr('VIDEO_FILES_FILTER')
         )
         for file_path in files:
@@ -492,7 +702,12 @@ class MainWindow(QMainWindow):
     
     def add_folder(self):
         """添加文件夹"""
-        folder = QFileDialog.getExistingDirectory(self, self.tr('SELECT_FOLDER'))
+        # 获取上次保存的目录路径
+        last_dir = self.config_manager.get("last_file_dir", "")
+        if not last_dir or not os.path.exists(last_dir):
+            last_dir = ""
+        
+        folder = QFileDialog.getExistingDirectory(self, self.tr('SELECT_FOLDER'), last_dir)
         if folder:
             self.add_path(folder)
     
@@ -523,29 +738,92 @@ class MainWindow(QMainWindow):
         self.update_total_size_display()
 
     def on_table_context_menu(self, pos):
-        """文件列表右键菜单：用于修改状态（等待编码 / 挂起）"""
+        """文件列表右键菜单：用于修改状态（等待编码 / 挂起）、打开文件、定位文件"""
         indexes = self.file_table.selectedIndexes()
         if not indexes:
             return
         rows = sorted({idx.row() for idx in indexes})
+        
+        # 获取选中行的文件路径（只处理第一行，如果多选则只对第一行操作）
+        if rows:
+            path_item = self.file_table.item(rows[0], COL_PATH)
+            if not path_item:
+                return
+            file_path = path_item.text()
+        else:
+            return
+        
         # 构建菜单
         menu = QMenu(self)
+        
+        # 状态操作
         action_waiting = menu.addAction(self.tr('STATUS_WAITING'))
         action_paused = menu.addAction(self.tr('STATUS_PAUSED'))
+        menu.addSeparator()
+        
+        # 文件操作
+        action_open_file = menu.addAction(self.tr('OPEN_SOURCE_FILE'))
+        action_reveal_file = menu.addAction(self.tr('REVEAL_SOURCE_FILE'))
+        
         global_pos = self.file_table.viewport().mapToGlobal(pos)
         action = menu.exec_(global_pos)
         if not action:
             return
 
-        for row in rows:
-            path_item = self.file_table.item(row, self.file_table.columnCount() - 1)
-            if not path_item:
-                continue
-            file_path = path_item.text()
-            if action == action_waiting:
-                self._set_file_status(file_path, STATUS_WAITING)
-            elif action == action_paused:
-                self._set_file_status(file_path, STATUS_PAUSED)
+        # 处理文件操作
+        if action == action_open_file:
+            self._open_source_file(file_path)
+        elif action == action_reveal_file:
+            self._reveal_source_file(file_path)
+        # 处理状态操作
+        elif action == action_waiting:
+            for row in rows:
+                path_item = self.file_table.item(row, COL_PATH)
+                if path_item:
+                    self._set_file_status(path_item.text(), STATUS_WAITING)
+        elif action == action_paused:
+            for row in rows:
+                path_item = self.file_table.item(row, COL_PATH)
+                if path_item:
+                    self._set_file_status(path_item.text(), STATUS_PAUSED)
+    
+    def _open_source_file(self, file_path: str):
+        """使用系统默认程序打开源文件"""
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, self.tr('MSG_ERROR'), self.tr('MSG_FILE_NOT_FOUND'))
+            return
+        
+        try:
+            if sys.platform == 'win32':
+                os.startfile(file_path)
+            elif sys.platform == 'darwin':  # macOS
+                subprocess.run(['open', file_path])
+            else:  # Linux
+                subprocess.run(['xdg-open', file_path])
+        except Exception as e:
+            QMessageBox.warning(self, self.tr('MSG_ERROR'), 
+                             self.tr('MSG_OPEN_FILE_FAILED').format(error=str(e)))
+    
+    def _reveal_source_file(self, file_path: str):
+        """打开源文件所在目录并选中文件"""
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, self.tr('MSG_ERROR'), self.tr('MSG_FILE_NOT_FOUND'))
+            return
+        
+        try:
+            if sys.platform == 'win32':
+                # Windows: 使用 explorer /select 命令
+                subprocess.run(['explorer', '/select,', os.path.normpath(file_path)])
+            elif sys.platform == 'darwin':  # macOS
+                # macOS: 使用 open -R 命令
+                subprocess.run(['open', '-R', file_path])
+            else:  # Linux
+                # Linux: 打开文件所在目录
+                file_dir = os.path.dirname(file_path)
+                subprocess.run(['xdg-open', file_dir])
+        except Exception as e:
+            QMessageBox.warning(self, self.tr('MSG_ERROR'), 
+                             self.tr('MSG_REVEAL_FILE_FAILED').format(error=str(e)))
     
     def format_file_size(self, size_bytes: int) -> str:
         """格式化文件大小"""
@@ -643,7 +921,7 @@ class MainWindow(QMainWindow):
             cell.setBackground(brush)
     
     def add_file_to_table(self, file_path: str):
-        """添加文件到表格并获取详细信息"""
+        """添加文件到表格（仅显示基本信息，详细信息由异步加载）"""
         row = self.file_table.rowCount()
         self.file_table.insertRow(row)
         
@@ -678,31 +956,14 @@ class MainWindow(QMainWindow):
         # 应用当前状态的文本与颜色
         self._set_file_status(file_path, status_code)
         
-        # 异步获取详细信息
-        if self.ffmpeg_handler:
-            try:
-                info = self.ffmpeg_handler.get_detailed_video_info(file_path)
-                self.file_info_dict[file_path] = info
-                # 临时禁用排序，更新信息
-                self.file_table.setSortingEnabled(False)
-                self.update_file_info(row, file_path, info)
-                self.file_table.setSortingEnabled(True)
-            except Exception as e:
-                self.log(f"获取文件信息失败 {filename}: {str(e)}")
-                self.file_table.setSortingEnabled(False)
-                self.update_file_info(row, file_path, {})
-                self.file_table.setSortingEnabled(True)
-        else:
-            # 如果没有FFmpeg，至少显示文件大小
-            self.file_table.setSortingEnabled(False)
-            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        # 至少显示文件大小（即使没有FFmpeg）
+        if os.path.exists(file_path):
+            file_size = os.path.getsize(file_path)
             size_str = self.format_file_size(file_size)
             size_item = NumericTableWidgetItem(size_str)
             size_item.setData(Qt.UserRole, file_size)
-            size_item.setToolTip(size_str)  # 设置tooltip
+            size_item.setToolTip(size_str)
             self.file_table.setItem(row, COL_FILE_SIZE, size_item)
-            self.update_file_info(row, file_path, {})
-            self.file_table.setSortingEnabled(True)
     
     def update_file_info(self, row: int, file_path: str, info: dict):
         """更新文件信息到表格"""
@@ -1029,6 +1290,11 @@ class MainWindow(QMainWindow):
         self.overall_progress_label.setText(self.tr('PREPARING'))
         self.current_file_label.setText("")
         
+        # 显示并重置任务栏进度条（仅 Windows）
+        if HAS_WIN_TASKBAR and hasattr(self, 'taskbar_progress'):
+            self.taskbar_progress.setValue(0)
+            self.taskbar_progress.setVisible(True)
+        
         # 启动编码
         self.encode_worker.start()
         self.log(self.tr('LOG_START_ENCODING').format(count=len(self.file_list)))
@@ -1038,6 +1304,10 @@ class MainWindow(QMainWindow):
         if self.encode_worker:
             self.encode_worker.cancel()
             self.log(self.tr('STOPPING'))
+            
+            # 隐藏任务栏进度条（仅 Windows）
+            if HAS_WIN_TASKBAR and hasattr(self, 'taskbar_progress'):
+                self.taskbar_progress.setVisible(False)
     
     def on_file_started(self, current: int, total: int, file_path: str):
         """文件开始编码"""
@@ -1075,10 +1345,15 @@ class MainWindow(QMainWindow):
         # 计算并更新总体进度条
         # 总体进度 = (已完成文件数 * 100 + 当前文件进度) / 总文件数
         overall_progress = ((current - 1) * 100 + progress) / total if total > 0 else 0
-        self.overall_progress_bar.setValue(int(overall_progress))
+        overall_progress_int = int(overall_progress)
+        self.overall_progress_bar.setValue(overall_progress_int)
         self.overall_progress_label.setText(self.tr('PROGRESS_FORMAT').format(
-            current=current, total=total, percent=int(overall_progress)
+            current=current, total=total, percent=overall_progress_int
         ))
+        
+        # 更新任务栏进度条（仅 Windows）
+        if HAS_WIN_TASKBAR and hasattr(self, 'taskbar_progress'):
+            self.taskbar_progress.setValue(overall_progress_int)
     
     def on_encoding_finished(self, results: list):
         """编码完成"""
@@ -1108,18 +1383,24 @@ class MainWindow(QMainWindow):
         ))
         self.current_file_label.setText("")
         
+        # 隐藏任务栏进度条（仅 Windows）
+        if HAS_WIN_TASKBAR and hasattr(self, 'taskbar_progress'):
+            self.taskbar_progress.setValue(100)
+            self.taskbar_progress.setVisible(False)
+        
+        # 队列完成后根据设置播放提示音（在显示消息框之前播放）
+        self.play_completion_sound()
+        
         # 显示结果（使用QMessageBox.information，确保不会导致程序退出）
         msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Information)
+        # 使用NoIcon避免触发Windows系统提示音
+        msg_box.setIcon(QMessageBox.NoIcon)
         msg_box.setWindowTitle(self.tr('MSG_ENCODING_COMPLETE'))
         msg_box.setText(
             f"{self.tr('MSG_ENCODING_COMPLETE')}\n{self.tr('MSG_ENCODING_SUCCESS')}: {success_count}\n{self.tr('MSG_ENCODING_FAILED')}: {total_count - success_count}"
         )
         msg_box.setStandardButtons(QMessageBox.Ok)
         msg_box.exec_()
-
-        # 队列完成后根据设置播放提示音
-        self.play_completion_sound()
         
         # 记录日志
         for file_path, _, success, msg in results:
@@ -1132,10 +1413,6 @@ class MainWindow(QMainWindow):
 
     def play_completion_sound(self):
         """根据设置播放队列完成提示音"""
-        from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-        from PyQt5.QtCore import QUrl
-        import os
-
         if not self.config_manager.get("notification_sound_enabled", False):
             return
         sound_file = self.config_manager.get("notification_sound_file", "")
@@ -1152,6 +1429,17 @@ class MainWindow(QMainWindow):
         player.setVolume(100)
         player.play()
 
+    def showEvent(self, event):
+        """窗口显示时关联任务栏按钮（仅 Windows）"""
+        super().showEvent(event)
+        if HAS_WIN_TASKBAR and hasattr(self, 'taskbar_button'):
+            try:
+                # 窗口显示后，将任务栏按钮关联到窗口
+                self.taskbar_button.setWindow(self.windowHandle())
+            except Exception:
+                # 如果失败，忽略错误（可能在某些情况下窗口句柄还未准备好）
+                pass
+    
     def closeEvent(self, event):
         """窗口关闭时保存窗口大小"""
         try:

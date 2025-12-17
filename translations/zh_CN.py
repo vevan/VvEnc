@@ -46,10 +46,17 @@ class Translations:
     ENCODING_COMPLETE = "编码完成"
     STOPPING = "正在停止编码..."
     LOG_TITLE = "日志"
+    LOADING_FILES = "加载中..."
+    LOADING_FILES_INIT = "正在载入文件信息..."
+    LOADING_FILES_PROGRESS = "正在载入 {current}/{total} 文件"
     
     # 控制按钮
     START_ENCODING = "开始编码"
     STOP = "停止"
+    
+    # 右键菜单
+    OPEN_SOURCE_FILE = "打开源文件"
+    REVEAL_SOURCE_FILE = "定位源文件目录"
     
     # 消息框
     MSG_ERROR = "错误"
@@ -66,6 +73,9 @@ class Translations:
     MSG_ENCODING_COMPLETE = "编码完成！"
     MSG_ENCODING_SUCCESS = "成功"
     MSG_ENCODING_FAILED = "失败"
+    MSG_FILE_NOT_FOUND = "文件未找到"
+    MSG_OPEN_FILE_FAILED = "打开文件失败: {error}"
+    MSG_REVEAL_FILE_FAILED = "定位文件失败: {error}"
     
     # 文件对话框
     SELECT_VIDEO_FILES = "选择视频文件"

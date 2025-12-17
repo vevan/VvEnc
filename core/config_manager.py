@@ -34,7 +34,8 @@ class ConfigManager:
             "custom_args": "",  # 自定义FFmpeg参数
             "use_custom_command": False,  # 是否使用自定义命令行
             "custom_command_template": "",
-            "language": "zh_CN"  # 语言设置
+            "language": "zh_CN",  # 语言设置
+            "last_file_dir": ""  # 最后添加的文件所在目录，用于下次打开文件对话框时的初始路径
         }
         self.config = self.load_config()
     

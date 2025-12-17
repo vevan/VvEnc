@@ -46,10 +46,17 @@ class Translations:
     ENCODING_COMPLETE = "エンコード完了"
     STOPPING = "エンコードを停止中..."
     LOG_TITLE = "ログ"
+    LOADING_FILES = "読み込み中..."
+    LOADING_FILES_INIT = "ファイル情報を読み込んでいます..."
+    LOADING_FILES_PROGRESS = "読み込み中 {current}/{total} ファイル"
     
     # 制御ボタン
     START_ENCODING = "エンコード開始"
     STOP = "停止"
+    
+    # コンテキストメニュー
+    OPEN_SOURCE_FILE = "ソースファイルを開く"
+    REVEAL_SOURCE_FILE = "ファイルの場所を表示"
     
     # メッセージボックス
     MSG_ERROR = "エラー"
@@ -66,6 +73,9 @@ class Translations:
     MSG_ENCODING_COMPLETE = "エンコード完了！"
     MSG_ENCODING_SUCCESS = "成功"
     MSG_ENCODING_FAILED = "失敗"
+    MSG_FILE_NOT_FOUND = "ファイルが見つかりません"
+    MSG_OPEN_FILE_FAILED = "ファイルを開くのに失敗しました: {error}"
+    MSG_REVEAL_FILE_FAILED = "ファイルの場所を表示するのに失敗しました: {error}"
     
     # ファイルダイアログ
     SELECT_VIDEO_FILES = "動画ファイルを選択"

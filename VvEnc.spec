@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('core', 'core'), ('gui', 'gui'), ('translations', 'translations')]
+datas = [('core', 'core'), ('gui', 'gui'), ('translations', 'translations'), ('icon.ico', '.')]
 binaries = []
 hiddenimports = ['PyQt5.QtCore', 'PyQt5.QtGui', 'PyQt5.QtWidgets']
 tmp_ret = collect_all('PyQt5')

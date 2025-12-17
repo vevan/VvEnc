@@ -56,7 +56,11 @@ echo Cleanup complete
 
 echo.
 echo [4/5] Building executable...
-python -m PyInstaller --name="VvEnc" --onefile --windowed %ICON_PARAM% --add-data "core;core" --add-data "gui;gui" --add-data "translations;translations" --hidden-import=PyQt5.QtCore --hidden-import=PyQt5.QtGui --hidden-import=PyQt5.QtWidgets --collect-all PyQt5 --clean main.py
+set ADD_DATA_PARAM=--add-data "core;core" --add-data "gui;gui" --add-data "translations;translations"
+if exist icon.ico (
+    set ADD_DATA_PARAM=%ADD_DATA_PARAM% --add-data "icon.ico;."
+)
+python -m PyInstaller --name="VvEnc" --onefile --windowed %ICON_PARAM% %ADD_DATA_PARAM% --hidden-import=PyQt5.QtCore --hidden-import=PyQt5.QtGui --hidden-import=PyQt5.QtWidgets --collect-all PyQt5 --clean main.py
 
 if errorlevel 1 (
     echo [ERROR] Build failed
@@ -65,7 +69,21 @@ if errorlevel 1 (
 )
 
 echo.
-echo [5/5] Build complete!
+echo [5/5] Copying additional files...
+if exist ringtone.mp3 (
+    copy /Y ringtone.mp3 dist\ >nul 2>&1
+    echo Copied ringtone.mp3
+) else (
+    echo [WARNING] ringtone.mp3 not found, skipping
+)
+if exist config.json (
+    copy /Y config.json dist\ >nul 2>&1
+    echo Copied config.json
+) else (
+    echo [WARNING] config.json not found, skipping
+)
+echo.
+echo Build complete!
 echo.
 echo Executable: dist\VvEnc.exe
 echo.
