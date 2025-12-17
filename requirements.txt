@@ -1,4 +1,11 @@
+# Batch Video Encoder - Python Dependencies
+# Python 3.8+ required
+
+# GUI Framework
 PyQt5>=5.15.0
 
-
-
+# Note: FFmpeg is required but not installed via pip
+# Please install FFmpeg separately:
+# - Windows: Download from https://ffmpeg.org/download.html
+# - macOS: brew install ffmpeg
+# - Linux: sudo apt install ffmpeg (or equivalent)

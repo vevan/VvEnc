@@ -4,11 +4,11 @@
 
 1. 双击运行 `build_exe.bat` 批处理文件
 2. 等待打包完成（通常需要1-3分钟）
-3. 打包完成后，exe文件位于 `dist\VideoEncoder.exe`
+3. 打包完成后，exe文件位于 `dist\VvEnc.exe`
 
 ## 打包结果
 
-- **输出位置**: `dist\VideoEncoder.exe`
+- **输出位置**: `dist\VvEnc.exe`
 - **文件大小**: 约 60-65 MB（包含所有依赖）
 - **运行要求**: 
   - Windows 7 或更高版本
