@@ -1,0 +1,158 @@
+name: Build Multi-Platform
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送以 v 开头的标签时触发
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: false
+        default: 'dev'
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            exe_name: VvEnc.exe
+            archive_ext: zip
+          - os: ubuntu-latest
+            exe_name: VvEnc
+            archive_ext: tar.gz
+          - os: macos-latest
+            exe_name: VvEnc
+            archive_ext: tar.gz
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pip install Pillow
+      
+      - name: Convert icon (if needed)
+        run: |
+          if [ -f icon.png ] && [ ! -f icon.ico ]; then
+            python convert_icon.py || true
+          fi
+        continue-on-error: true
+      
+      - name: Clean old build files
+        shell: bash
+        run: |
+          rm -rf build dist *.spec
+        continue-on-error: true
+      
+      - name: Build executable (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          $iconParam = ""
+          if (Test-Path icon.ico) {
+            $iconParam = "--icon=icon.ico"
+          }
+          
+          $addData = "--add-data `"core;core`" --add-data `"gui;gui`" --add-data `"translations;translations`""
+          if (Test-Path icon.ico) {
+            $addData = "$addData --add-data `"icon.ico;.`""
+          }
+          
+          python -m PyInstaller --name="VvEnc" --onefile --windowed $iconParam $addData --hidden-import=PyQt5.QtCore --hidden-import=PyQt5.QtGui --hidden-import=PyQt5.QtWidgets --collect-all PyQt5 --clean main.py
+      
+      - name: Build executable (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          ICON_PARAM=""
+          if [ -f icon.ico ]; then
+            ICON_PARAM="--icon=icon.ico"
+          fi
+          
+          ADD_DATA="--add-data 'core:core' --add-data 'gui:gui' --add-data 'translations:translations'"
+          if [ -f icon.ico ]; then
+            ADD_DATA="$ADD_DATA --add-data 'icon.ico:.'"
+          fi
+          
+          python -m PyInstaller --name="VvEnc" --onefile $ICON_PARAM $ADD_DATA --hidden-import=PyQt5.QtCore --hidden-import=PyQt5.QtGui --hidden-import=PyQt5.QtWidgets --collect-all PyQt5 --clean main.py
+      
+      - name: Copy additional files
+        shell: bash
+        run: |
+          if [ -f ringtone.mp3 ]; then
+            cp ringtone.mp3 dist/
+          fi
+          if [ -f config.json ]; then
+            cp config.json dist/
+          fi
+        continue-on-error: true
+      
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          VERSION=$(echo $VERSION | sed 's/^v//')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Create release archive (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          $archiveName = "VvEnc-Windows-x64-$env:VERSION.zip"
+          Compress-Archive -Path dist\* -DestinationPath $archiveName -Force
+          echo "ARCHIVE_NAME=$archiveName" >> $env:GITHUB_ENV
+      
+      - name: Create release archive (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          OS_NAME=$(echo "${{ matrix.os }}" | sed 's/-latest//' | tr '[:upper:]' '[:lower:]')
+          ARCHIVE_NAME="VvEnc-${OS_NAME^}-x64-${{ env.VERSION }}.tar.gz"
+          cd dist
+          tar -czf "../$ARCHIVE_NAME" *
+          cd ..
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VvEnc-${{ matrix.os }}
+          path: |
+            dist/${{ matrix.exe_name }}
+            ${{ env.ARCHIVE_NAME }}
+          retention-days: 30
+      
+      - name: Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ env.ARCHIVE_NAME }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

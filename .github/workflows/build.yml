@@ -1,0 +1,114 @@
+name: Build Executable
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送以 v 开头的标签时触发（如 v1.0.0）
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: false
+        default: 'dev'
+
+jobs:
+  build-windows:
+    name: Build Windows Executable
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pip install Pillow  # 用于图标转换（如果需要）
+      
+      - name: Convert icon (if needed)
+        run: |
+          if (Test-Path icon.png) {
+            if (-not (Test-Path icon.ico)) {
+              python convert_icon.py
+            }
+          }
+        continue-on-error: true
+      
+      - name: Clean old build files
+        run: |
+          if (Test-Path build) { Remove-Item -Recurse -Force build }
+          if (Test-Path dist) { Remove-Item -Recurse -Force dist }
+          if (Test-Path *.spec) { Remove-Item -Force *.spec }
+      
+      - name: Build executable
+        run: |
+          $iconParam = ""
+          if (Test-Path icon.ico) {
+            $iconParam = "--icon=icon.ico"
+          }
+          
+          $addData = "--add-data `"core;core`" --add-data `"gui;gui`" --add-data `"translations;translations`""
+          if (Test-Path icon.ico) {
+            $addData = "$addData --add-data `"icon.ico;.`""
+          }
+          
+          python -m PyInstaller --name="VvEnc" --onefile --windowed $iconParam $addData --hidden-import=PyQt5.QtCore --hidden-import=PyQt5.QtGui --hidden-import=PyQt5.QtWidgets --collect-all PyQt5 --clean main.py
+      
+      - name: Copy additional files
+        run: |
+          if (Test-Path ringtone.mp3) {
+            Copy-Item ringtone.mp3 dist\
+          }
+          if (Test-Path config.json) {
+            Copy-Item config.json dist\
+          }
+      
+      - name: Get version
+        id: get_version
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ github.event.inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}"
+          }
+          if ($version -match "^v(.+)") {
+            $version = $matches[1]
+          }
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+      
+      - name: Create release archive
+        run: |
+          $archiveName = "VvEnc-Windows-x64-$env:VERSION.zip"
+          Compress-Archive -Path dist\* -DestinationPath $archiveName -Force
+          echo "ARCHIVE_NAME=$archiveName" >> $env:GITHUB_ENV
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VvEnc-Windows-x64
+          path: |
+            dist/VvEnc.exe
+            ${{ env.ARCHIVE_NAME }}
+          retention-days: 30
+      
+      - name: Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ env.ARCHIVE_NAME }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

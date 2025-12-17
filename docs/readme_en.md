@@ -54,6 +54,8 @@ The application automatically saves configuration to `config.json`, including:
 - [Usage Guide (English)](usage_en.md) - Detailed usage instructions
 - [Usage Guide (Chinese)](usage_cn.md) - 详细使用说明
 - [Building Executable](package_en.md) - How to build standalone executable
+- [GitHub Actions Auto Build](github_actions_en.md) - Auto build with GitHub Actions
+- [GitHub Actions 自动打包](github_actions.md) - 使用 GitHub Actions 自动构建
 
 ## Key Features
 

@@ -73,6 +73,8 @@
 - [📗 Usage Guide (English)](docs/usage_en.md) - Detailed usage instructions
 - [📦 打包说明](docs/package.md) - 如何打包成独立可执行文件
 - [📦 Building Executable](docs/package_en.md) - How to build standalone executable
+- [🚀 GitHub Actions 自动打包](docs/github_actions.md) - 使用 GitHub Actions 自动构建
+- [🚀 GitHub Actions Auto Build](docs/github_actions_en.md) - Auto build with GitHub Actions
 
 ## ⚙️ 配置说明
 
