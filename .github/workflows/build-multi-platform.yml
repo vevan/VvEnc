@@ -169,7 +169,9 @@ jobs:
         shell: bash
         run: |
           OS_NAME=$(echo "${{ matrix.os }}" | sed 's/-latest//' | tr '[:upper:]' '[:lower:]')
-          ARCHIVE_NAME="VvEnc-${OS_NAME^}-x64-${{ env.VERSION }}.tar.gz"
+          # macOS bash 可能不支持 ${var^}，使用 awk 首字母大写（更兼容）
+          OS_NAME_CAPITALIZED=$(echo "$OS_NAME" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
+          ARCHIVE_NAME="VvEnc-${OS_NAME_CAPITALIZED}-x64-${{ env.VERSION }}.tar.gz"
           cd dist
           tar -czf "../$ARCHIVE_NAME" *
           cd ..
