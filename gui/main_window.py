@@ -612,7 +612,7 @@ class MainWindow(QMainWindow):
                 self.config_manager.save_config()
         
         self.update_total_size_display()
-        self.log(self.tr('LOG_FILES_ADDED').format(count=len(new_files)))
+        self.log(self.tr('LOG_FILES_ADDED').format(count=len(new_files)), "info")
     
     def _load_file_info_async(self, files: list):
         """异步加载文件信息（显示进度对话框）"""
@@ -644,7 +644,7 @@ class MainWindow(QMainWindow):
                 self.file_table.setSortingEnabled(True)
             except Exception as e:
                 filename = os.path.basename(file_path)
-                self.log(f"获取文件信息失败 {filename}: {str(e)}")
+                self.log(f"获取文件信息失败 {filename}: {str(e)}", "error")
                 self.file_table.setSortingEnabled(False)
                 self.update_file_info(row, file_path, {})
                 self.file_table.setSortingEnabled(True)
@@ -1121,7 +1121,7 @@ class MainWindow(QMainWindow):
                 ffmpeg_path = self.config_manager.get("ffmpeg_path", "")
                 self.ffmpeg_handler = FFmpegHandler(ffmpeg_path if ffmpeg_path else "")
                 self.file_processor = FileProcessor(self.ffmpeg_handler)
-                self.log(self.tr('LOG_FFMPEG_UPDATED'))
+                self.log(self.tr('LOG_FFMPEG_UPDATED'), "success")
             except FileNotFoundError as e:
                 QMessageBox.warning(self, self.tr('MSG_ERROR'), f"{self.tr('MSG_FFMPEG_INIT_FAILED')}: {str(e)}")
     
@@ -1268,7 +1268,7 @@ class MainWindow(QMainWindow):
                     # 使用备用音频编码器和码率
                     audio_codec = fallback_audio_codec or "aac"
                     audio_bitrate = fallback_audio_bitrate or "192k"
-                    self.log(self.tr('LOG_AUDIO_CODEC_AUTO_AAC').format(bitrate=audio_bitrate))
+                    self.log(self.tr('LOG_AUDIO_CODEC_AUTO_AAC').format(bitrate=audio_bitrate), "warning")
             per_file_options[file_path] = {
                 "audio_codec": audio_codec,
                 "audio_bitrate": audio_bitrate,
@@ -1302,13 +1302,13 @@ class MainWindow(QMainWindow):
         
         # 启动编码
         self.encode_worker.start()
-        self.log(self.tr('LOG_START_ENCODING').format(count=len(self.file_list)))
+        self.log(self.tr('LOG_START_ENCODING').format(count=len(self.file_list)), "info")
     
     def stop_encoding(self):
         """停止编码"""
         if self.encode_worker:
             self.encode_worker.cancel()
-            self.log(self.tr('STOPPING'))
+            self.log(self.tr('STOPPING'), "warning")
             
             # 隐藏任务栏进度条（仅 Windows）
             if HAS_WIN_TASKBAR and hasattr(self, 'taskbar_progress'):
@@ -1317,27 +1317,28 @@ class MainWindow(QMainWindow):
     def on_file_started(self, current: int, total: int, file_path: str):
         """文件开始编码"""
         filename = os.path.basename(file_path)
-        # 更新状态为“正在编码”
+        # 更新状态为"正在编码"
         self._set_file_status(file_path, STATUS_ENCODING)
         self.log(self.tr('LOG_FILE_STARTED').format(
             current=current, total=total, filename=filename
-        ))
+        ), "info")
     
     def on_file_finished(self, current: int, total: int, file_path: str, success: bool, message: str):
         """文件结束编码"""
         filename = os.path.basename(file_path)
         if success:
-            # 更新状态为“编码完成”
+            # 更新状态为"编码完成"
             self._set_file_status(file_path, STATUS_DONE)
             self.log(self.tr('LOG_FILE_FINISHED_SUCCESS').format(
                 current=current, total=total, filename=filename, message=message
-            ))
+            ), "success")
         else:
-            # 更新状态为“编码失败”
+            # 更新状态为"编码失败"
             self._set_file_status(file_path, STATUS_FAILED)
+            # 失败时输出详细错误信息（message中已包含详细错误）
             self.log(self.tr('LOG_FILE_FINISHED_FAILED').format(
                 current=current, total=total, filename=filename, message=message
-            ))
+            ), "error")
     
     def on_progress_updated(self, current: int, total: int, file_path: str, progress: float, message: str):
         """进度更新"""
@@ -1410,11 +1411,39 @@ class MainWindow(QMainWindow):
         # 记录日志
         for file_path, _, success, msg in results:
             status = "✓" if success else "✗"
-            self.log(f"{status} {os.path.basename(file_path)}: {msg}")
+            log_type = "success" if success else "error"
+            self.log(f"{status} {os.path.basename(file_path)}: {msg}", log_type)
     
-    def log(self, message: str):
-        """记录日志"""
-        self.log_text.append(message)
+    def log(self, message: str, log_type: str = "info"):
+        """
+        记录日志
+        
+        Args:
+            message: 日志消息
+            log_type: 日志类型 ("info", "success", "warning", "error")
+        """
+        # 定义不同日志类型的颜色
+        colors = {
+            "info": "#000000",      # 黑色（默认）
+            "success": "#008000",    # 绿色
+            "warning": "#FF8C00",   # 橙色
+            "error": "#DC143C",      # 红色
+        }
+        
+        color = colors.get(log_type, colors["info"])
+        
+        # 使用HTML格式设置颜色
+        html_message = f'<span style="color: {color};">{self._escape_html(message)}</span>'
+        self.log_text.append(html_message)
+    
+    def _escape_html(self, text: str) -> str:
+        """转义HTML特殊字符"""
+        return (text.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;")
+                    .replace("'", "&#39;")
+                    .replace("\n", "<br>"))
 
     def play_completion_sound(self):
         """根据设置播放队列完成提示音"""

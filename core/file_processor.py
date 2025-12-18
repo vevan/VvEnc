@@ -11,7 +11,7 @@ class FileProcessor:
     """文件处理器"""
     
     # 支持的视频格式
-    VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.ts', '.mts', '.rm', '.rmvb'}
+    VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm','.m2ts', '.m2v', '.m4v', '.3gp', '.ts', '.mts', '.rm', '.rmvb', '.ts', '.mpg', '.mpeg', '.vob', '.dat'}
     
     def __init__(self, ffmpeg_handler: FFmpegHandler):
         self.ffmpeg_handler = ffmpeg_handler

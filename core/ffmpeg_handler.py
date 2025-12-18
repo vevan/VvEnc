@@ -341,7 +341,9 @@ class FFmpegHandler:
             
             # 解析进度
             time_pattern = re.compile(r'time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})')
+            error_pattern = re.compile(r'error|Error|ERROR|failed|Failed|FAILED|invalid|Invalid|INVALID')
             last_progress = 0.0
+            error_lines = []  # 收集错误信息
             
             while True:
                 # 检查取消标志
@@ -376,6 +378,10 @@ class FFmpegHandler:
                     time.sleep(0.05)
                     continue
                 
+                # 收集可能的错误信息（包含error/failed/invalid等关键词的行）
+                if error_pattern.search(line):
+                    error_lines.append(line.strip())
+                
                 # 解析时间戳
                 match = time_pattern.search(line)
                 if match:
@@ -398,8 +404,39 @@ class FFmpegHandler:
             elif process.returncode == -15 or process.returncode == -9:  # SIGTERM 或 SIGKILL
                 return False, "Cancelled"
             else:
-                error_msg = process.stderr.read() if process.stderr else "Unknown error"
-                return False, f"Failed: {error_msg}"
+                # 收集所有剩余的stderr输出
+                remaining_stderr = []
+                if process.stderr:
+                    try:
+                        # 尝试读取剩余的输出
+                        remaining_lines = process.stderr.readlines()
+                        remaining_stderr.extend([line.strip() for line in remaining_lines if line.strip()])
+                    except:
+                        pass
+                
+                # 合并所有错误信息
+                all_errors = error_lines + remaining_stderr
+                
+                # 构建详细的错误消息
+                if all_errors:
+                    # 去重并限制长度（避免过长）
+                    unique_errors = []
+                    seen = set()
+                    for err in all_errors:
+                        if err and err not in seen:
+                            seen.add(err)
+                            unique_errors.append(err)
+                            if len(unique_errors) >= 20:  # 最多保留20行错误信息
+                                break
+                    
+                    error_msg = "\n".join(unique_errors)
+                    # 如果错误信息太长，截断并添加提示
+                    if len(error_msg) > 1000:
+                        error_msg = error_msg[:1000] + "\n... (error message truncated)"
+                else:
+                    error_msg = "Unknown error (return code: {})".format(process.returncode)
+                
+                return False, f"Failed (return code: {process.returncode}):\n{error_msg}"
         
         except KeyboardInterrupt:
             if process:
