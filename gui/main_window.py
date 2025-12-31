@@ -1218,6 +1218,7 @@ class MainWindow(QMainWindow):
         video_crf = self.config_manager.get("video_crf", "23")
         video_bit_depth = self.config_manager.get("video_bit_depth", "8")
         video_resolution = self.config_manager.get("video_resolution", "")
+        video_framerate = self.config_manager.get("video_framerate", "")
         base_audio_codec = self.config_manager.get("audio_codec", "copy")
         base_audio_bitrate = self.config_manager.get("audio_bitrate", "")
         # 备用音频编码参数（当主编码为 copy 且不兼容 MP4 容器时使用）
@@ -1234,6 +1235,7 @@ class MainWindow(QMainWindow):
             "video_crf": video_crf,
             "video_bit_depth": video_bit_depth,
             "video_resolution": video_resolution,
+            "video_framerate": video_framerate,
             "audio_codec": base_audio_codec,
             "audio_bitrate": base_audio_bitrate,
             "subtitle_mode": subtitle_mode,

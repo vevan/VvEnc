@@ -114,6 +114,10 @@ class Translations:
         "If FFmpeg is not in system PATH, please specify the full path here."
     )
     BROWSE = "Browse..."
+    FFMPEG_DOWNLOAD_LINK = "Download FFmpeg"
+    FFMPEG_IN_PATH_MSG = "FFmpeg is already in system PATH, no need to set. You can specify another version if needed."
+    FFMPEG_NOT_IN_PATH_MSG = "FFmpeg is not in system PATH, please add it to PATH or specify the path manually."
+    FFMPEG_MANUAL_PATH_MSG = "FFmpeg path has been manually specified."
     
     # Video encoding parameters
     VIDEO_ENCODING_PARAMS = "Video Encoding Parameters"
@@ -163,6 +167,14 @@ class Translations:
         "  - 1080p: 1920:1080\n"
         "  - 720p: 1280:720\n"
         "  - 480p: 854:480"
+    )
+    FRAMERATE = "Frame Rate"
+    FRAMERATE_PLACEHOLDER = "e.g.: 30 or 29.97, leave empty to keep original frame rate"
+    FRAMERATE_TOOLTIP = (
+        "Video frame rate (fps):\n"
+        "• Leave empty: Keep original frame rate\n"
+        "• Format: number or decimal, e.g. 30, 29.97, 24, 60\n"
+        "• Common frame rates: 24 (cinema), 30 (NTSC), 29.97 (NTSC standard), 60 (high frame rate)"
     )
     
     # Audio encoding parameters
@@ -255,6 +267,10 @@ class Translations:
     MSG_FFMPEG_PATH_NOT_EXISTS = "The specified FFmpeg path does not exist, will try to use FFmpeg from system PATH"
     MSG_SETTINGS_SAVED = "Settings saved"
     MSG_SETTINGS_SAVE_FAILED = "Failed to save settings"
+    COPY_COMMAND = "Copy FFmpeg Command"
+    COPY_COMMAND_TOOLTIP = "Copy the current FFmpeg command to clipboard (using example paths)"
+    MSG_COMMAND_COPIED = "FFmpeg command copied to clipboard"
+    MSG_COMMAND_COPY_FAILED = "Failed to copy command"
     
     # Progress message formats
     PROGRESS_FORMAT = "Overall Progress: {current}/{total} files ({percent}%)"

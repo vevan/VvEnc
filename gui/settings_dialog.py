@@ -5,10 +5,15 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLineEdit, QPushButton, QComboBox, QSpinBox,
     QCheckBox, QTextEdit, QFileDialog, QGroupBox,
-    QLabel, QMessageBox
+    QLabel, QMessageBox, QFrame, QApplication
 )
 from PyQt5.QtCore import Qt
+import os
+import subprocess
+import re
+from typing import Optional
 from core.config_manager import ConfigManager
+from core.ffmpeg_handler import FFmpegHandler
 from translations import LanguageManager
 
 
@@ -28,6 +33,64 @@ class SettingsDialog(QDialog):
         """翻译函数"""
         return self.i18n_manager.tr(key, default)
     
+    def _get_version(self) -> str:
+        """获取版本号（从 version 文件读取，格式统一为 v0.x.x）"""
+        # 从 version 文件读取版本号（版本文件格式统一为带 v 前缀，如 v0.8.6）
+        try:
+            version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "version")
+            if os.path.exists(version_file):
+                with open(version_file, 'r', encoding='utf-8') as f:
+                    version = f.read().strip()
+                    # 版本文件统一格式为带 'v' 前缀，显示时移除 'v' 前缀
+                    if version.startswith('v'):
+                        version = version[1:]
+                    if version:
+                        return version
+        except Exception:
+            pass
+        
+        # 如果无法读取版本文件，返回默认版本（不带 v 前缀，用于显示）
+        return "0.8.6"
+    
+    def _check_ffmpeg_in_path(self) -> tuple[bool, str]:
+        """
+        检查 FFmpeg 是否在系统 PATH 中
+        
+        Returns:
+            (是否在PATH中, FFmpeg路径或None)
+        """
+        import shutil
+        ffmpeg_path = shutil.which("ffmpeg")
+        if ffmpeg_path:
+            return True, ffmpeg_path
+        return False, None
+    
+    def _update_ffmpeg_path_status(self):
+        """更新 FFmpeg 路径状态提示"""
+        # 如果用户手动指定了路径，检查该路径是否存在
+        manual_path = self.ffmpeg_path_edit.text().strip()
+        if manual_path and os.path.exists(manual_path):
+            # 用户已手动指定路径，显示绿色提示
+            self.ffmpeg_path_status_label.setText(
+                self.tr('FFMPEG_MANUAL_PATH_MSG', '已手动指定 FFmpeg 路径。')
+            )
+            self.ffmpeg_path_status_label.setStyleSheet("color: #008000; padding: 5px;")
+        else:
+            # 检查系统 PATH
+            in_path, path = self._check_ffmpeg_in_path()
+            if in_path:
+                # 绿色提示：FFmpeg 已在系统路径中
+                self.ffmpeg_path_status_label.setText(
+                    self.tr('FFMPEG_IN_PATH_MSG', 'FFmpeg 已添加到系统路径，无需设置。如有需要可指定其它版本。')
+                )
+                self.ffmpeg_path_status_label.setStyleSheet("color: #008000; padding: 5px;")
+            else:
+                # 红色提示：FFmpeg 未在系统路径中
+                self.ffmpeg_path_status_label.setText(
+                    self.tr('FFMPEG_NOT_IN_PATH_MSG', 'FFmpeg 未添加到系统路径，请添加系统路径或手动指定路径。')
+                )
+                self.ffmpeg_path_status_label.setStyleSheet("color: #DC143C; padding: 5px;")
+    
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
@@ -38,6 +101,7 @@ class SettingsDialog(QDialog):
         
         self.ffmpeg_path_edit = QLineEdit()
         self.ffmpeg_path_edit.setToolTip(self.tr('FFMPEG_PATH_TOOLTIP'))
+        self.ffmpeg_path_edit.textChanged.connect(self._update_ffmpeg_path_status)
         self.ffmpeg_browse_btn = QPushButton(self.tr('BROWSE'))
         self.ffmpeg_browse_btn.clicked.connect(self.browse_ffmpeg)
         ffmpeg_path_layout = QHBoxLayout()
@@ -46,6 +110,22 @@ class SettingsDialog(QDialog):
         ffmpeg_layout.addRow(self.tr('FFMPEG_PATH') + ":", ffmpeg_path_layout)
         ffmpeg_group.setLayout(ffmpeg_layout)
         layout.addWidget(ffmpeg_group)
+        
+        # FFmpeg 路径状态提示
+        self.ffmpeg_path_status_label = QLabel()
+        self.ffmpeg_path_status_label.setWordWrap(True)
+        self._update_ffmpeg_path_status()
+        layout.addWidget(self.ffmpeg_path_status_label)
+        
+        # FFmpeg 下载链接
+        ffmpeg_download_label = QLabel()
+        ffmpeg_download_label.setOpenExternalLinks(True)
+        ffmpeg_download_label.setText(
+            '<a href="https://ffmpeg.org/download.html" style="color: #0066cc;">'
+            + self.tr('FFMPEG_DOWNLOAD_LINK', '下载 FFmpeg') + '</a>'
+        )
+        ffmpeg_download_label.setAlignment(Qt.AlignRight)
+        layout.addWidget(ffmpeg_download_label)
         
         # 视频编码参数
         video_group = QGroupBox(self.tr('VIDEO_ENCODING_PARAMS'))
@@ -86,6 +166,11 @@ class SettingsDialog(QDialog):
         self.video_resolution_edit.setPlaceholderText(self.tr('RESOLUTION_PLACEHOLDER'))
         self.video_resolution_edit.setToolTip(self.tr('RESOLUTION_TOOLTIP'))
         video_layout.addRow(self.tr('RESOLUTION') + ":", self.video_resolution_edit)
+        
+        self.video_framerate_edit = QLineEdit()
+        self.video_framerate_edit.setPlaceholderText(self.tr('FRAMERATE_PLACEHOLDER', '例如: 30 或 29.97，留空保持原始帧率'))
+        self.video_framerate_edit.setToolTip(self.tr('FRAMERATE_TOOLTIP', '视频帧率（fps）。留空则保持原始帧率。例如: 30, 29.97, 24'))
+        video_layout.addRow(self.tr('FRAMERATE', '帧率') + ":", self.video_framerate_edit)
         
         video_group.setLayout(video_layout)
         layout.addWidget(video_group)
@@ -175,8 +260,63 @@ class SettingsDialog(QDialog):
         self.custom_args_edit.setToolTip(self.tr('CUSTOM_ARGS_TOOLTIP'))
         custom_layout.addWidget(self.custom_args_edit)
         
+        # 复制命令按钮
+        copy_command_btn = QPushButton(self.tr('COPY_COMMAND', '复制 FFmpeg 命令'))
+        copy_command_btn.setToolTip(self.tr('COPY_COMMAND_TOOLTIP', '复制当前设置的 FFmpeg 命令到剪贴板'))
+        copy_command_btn.clicked.connect(self.copy_ffmpeg_command)
+        custom_layout.addWidget(copy_command_btn)
+        
         custom_group.setLayout(custom_layout)
         layout.addWidget(custom_group)
+        
+        # 添加分隔线
+        layout.addSpacing(10)
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(line)
+        
+        # 版本信息和链接区域
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(5)
+        
+        # 版本信息
+        version = self._get_version()
+        version_label = QLabel(f"VvEnc {version}")
+        version_label.setAlignment(Qt.AlignCenter)
+        version_label.setStyleSheet("color: #666666; font-size: 10pt;")
+        info_layout.addWidget(version_label)
+        
+        # 链接区域
+        links_layout = QHBoxLayout()
+        links_layout.addStretch()
+        
+        # FFmpeg 官网链接
+        ffmpeg_website_label = QLabel()
+        ffmpeg_website_label.setOpenExternalLinks(True)
+        ffmpeg_website_label.setText(
+            '<a href="https://ffmpeg.org/" style="color: #0066cc;">FFmpeg</a>'
+        )
+        links_layout.addWidget(ffmpeg_website_label)
+        
+        # 分隔符
+        separator = QLabel(" | ")
+        separator.setStyleSheet("color: #999999;")
+        links_layout.addWidget(separator)
+        
+        # GPL 协议链接
+        gpl_label = QLabel()
+        gpl_label.setOpenExternalLinks(True)
+        gpl_label.setText(
+            '<a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color: #0066cc;">GPL-3.0</a>'
+        )
+        links_layout.addWidget(gpl_label)
+        
+        links_layout.addStretch()
+        info_layout.addLayout(links_layout)
+        
+        layout.addLayout(info_layout)
+        layout.addSpacing(5)
         
         # 按钮
         button_layout = QHBoxLayout()
@@ -235,6 +375,7 @@ class SettingsDialog(QDialog):
         )
         if path:
             self.ffmpeg_path_edit.setText(path)
+            # 路径改变时会自动触发 _update_ffmpeg_path_status
 
     def browse_notify_sound(self):
         """选择提示音文件"""
@@ -258,6 +399,7 @@ class SettingsDialog(QDialog):
         self.video_crf_spin.setValue(int(self.config_manager.get("video_crf", "23")))
         self.video_bit_depth_combo.setCurrentText(self.config_manager.get("video_bit_depth", "8"))
         self.video_resolution_edit.setText(self.config_manager.get("video_resolution", ""))
+        self.video_framerate_edit.setText(self.config_manager.get("video_framerate", ""))
         self.audio_codec_combo.setCurrentText(self.config_manager.get("audio_codec", "copy"))
         self.audio_bitrate_edit.setText(self.config_manager.get("audio_bitrate", ""))
         self.fallback_audio_codec_combo.setCurrentText(self.config_manager.get("fallback_audio_codec", "aac"))
@@ -288,6 +430,7 @@ class SettingsDialog(QDialog):
             "video_crf": str(self.video_crf_spin.value()),
             "video_bit_depth": self.video_bit_depth_combo.currentText(),
             "video_resolution": self.video_resolution_edit.text().strip(),
+            "video_framerate": self.video_framerate_edit.text().strip(),
             "audio_codec": self.audio_codec_combo.currentText(),
             "audio_bitrate": self.audio_bitrate_edit.text().strip(),
             "fallback_audio_codec": self.fallback_audio_codec_combo.currentText(),
@@ -305,4 +448,106 @@ class SettingsDialog(QDialog):
             self.accept()
         else:
             QMessageBox.warning(self, self.tr('MSG_ERROR'), self.tr('MSG_SETTINGS_SAVE_FAILED'))
+    
+    def copy_ffmpeg_command(self):
+        """复制当前设置的 FFmpeg 命令到剪贴板"""
+        try:
+            # 获取当前设置
+            ffmpeg_path = self.ffmpeg_path_edit.text().strip()
+            if not ffmpeg_path:
+                # 尝试从系统 PATH 查找
+                import shutil
+                ffmpeg_path = shutil.which("ffmpeg") or "ffmpeg"
+            
+            # 创建临时 FFmpegHandler 实例
+            # 如果找不到 FFmpeg，仍然可以生成命令（使用默认路径）
+            try:
+                handler = FFmpegHandler(ffmpeg_path if ffmpeg_path else "")
+            except FileNotFoundError:
+                # 如果找不到 FFmpeg，创建一个临时对象来生成命令
+                # 这种情况下，我们仍然可以生成命令字符串
+                import shutil
+                # 尝试查找 FFmpeg，如果找不到就使用默认名称
+                found_ffmpeg = shutil.which("ffmpeg")
+                if found_ffmpeg:
+                    handler = FFmpegHandler(found_ffmpeg)
+                else:
+                    # 创建一个最小化的处理器，只用于生成命令
+                    handler = FFmpegHandler.__new__(FFmpegHandler)
+                    handler.ffmpeg_path = ffmpeg_path or "ffmpeg"
+            
+            # 获取当前设置值
+            video_codec = self.video_codec_combo.currentText()
+            video_preset = self.video_preset_combo.currentText()
+            video_crf = str(self.video_crf_spin.value())
+            video_bit_depth = self.video_bit_depth_combo.currentText()
+            video_resolution = self.video_resolution_edit.text().strip()
+            video_framerate = self.video_framerate_edit.text().strip()
+            audio_codec = self.audio_codec_combo.currentText()
+            audio_bitrate = self.audio_bitrate_edit.text().strip()
+            subtitle_mode = self.subtitle_combo.currentText()
+            custom_args = self.custom_args_edit.text().strip()
+            use_custom = self.use_custom_check.isChecked()
+            custom_template = self.custom_command_edit.toPlainText().strip()
+            
+            # 使用示例路径
+            example_input = "input.mp4"
+            example_output = "output.mp4"
+            
+            # 构建命令
+            cmd = handler.build_command(
+                input_path=example_input,
+                output_path=example_output,
+                video_codec=video_codec,
+                video_preset=video_preset,
+                video_crf=video_crf,
+                video_resolution=video_resolution,
+                video_bit_depth=video_bit_depth,
+                video_framerate=video_framerate,
+                audio_codec=audio_codec,
+                audio_bitrate=audio_bitrate,
+                subtitle_mode=subtitle_mode,
+                custom_args=custom_args,
+                use_custom=use_custom,
+                custom_template=custom_template
+            )
+            
+            # 将 FFmpeg 路径替换为 ffmpeg.exe（Windows）或 ffmpeg（其他系统）
+            # build_command 返回的第一个元素是 FFmpeg 路径
+            if cmd and len(cmd) > 0:
+                import sys
+                # 根据操作系统选择命令名称
+                if sys.platform == 'win32':
+                    cmd[0] = 'ffmpeg.exe'
+                else:
+                    cmd[0] = 'ffmpeg'
+            
+            # 将命令列表转换为字符串
+            # 对于包含空格的参数，需要加引号
+            cmd_str_parts = []
+            for arg in cmd:
+                if ' ' in arg or '\t' in arg:
+                    # 如果参数包含空格，用引号包裹
+                    cmd_str_parts.append(f'"{arg}"')
+                else:
+                    cmd_str_parts.append(arg)
+            
+            cmd_str = ' '.join(cmd_str_parts)
+            
+            # 复制到剪贴板
+            clipboard = QApplication.clipboard()
+            clipboard.setText(cmd_str)
+            
+            # 显示成功消息
+            QMessageBox.information(
+                self,
+                self.tr('MSG_SUCCESS', '成功'),
+                self.tr('MSG_COMMAND_COPIED', 'FFmpeg 命令已复制到剪贴板')
+            )
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                self.tr('MSG_ERROR', '错误'),
+                self.tr('MSG_COMMAND_COPY_FAILED', '复制命令失败') + f": {str(e)}"
+            )
 

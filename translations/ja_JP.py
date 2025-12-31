@@ -114,6 +114,10 @@ class Translations:
         "システムPATHにFFmpegがない場合は、ここに完全パスを指定してください。"
     )
     BROWSE = "参照..."
+    FFMPEG_DOWNLOAD_LINK = "FFmpeg をダウンロード"
+    FFMPEG_IN_PATH_MSG = "FFmpeg はシステム PATH に追加されています。設定は不要です。必要に応じて他のバージョンを指定できます。"
+    FFMPEG_NOT_IN_PATH_MSG = "FFmpeg がシステム PATH に追加されていません。PATH に追加するか、手動でパスを指定してください。"
+    FFMPEG_MANUAL_PATH_MSG = "FFmpeg パスを手動で指定しました。"
     
     # 動画エンコードパラメータ
     VIDEO_ENCODING_PARAMS = "動画エンコードパラメータ"
@@ -163,6 +167,14 @@ class Translations:
         "  - 1080p: 1920:1080\n"
         "  - 720p: 1280:720\n"
         "  - 480p: 854:480"
+    )
+    FRAMERATE = "フレームレート"
+    FRAMERATE_PLACEHOLDER = "例: 30 または 29.97、空欄で元のフレームレートを維持"
+    FRAMERATE_TOOLTIP = (
+        "動画フレームレート（fps）：\n"
+        "• 空欄：元のフレームレートを維持\n"
+        "• 形式：数字または小数、例 30, 29.97, 24, 60\n"
+        "• 一般的なフレームレート：24（映画）、30（NTSC）、29.97（NTSC標準）、60（高フレームレート）"
     )
     
     # 音声エンコードパラメータ
@@ -255,6 +267,10 @@ class Translations:
     MSG_FFMPEG_PATH_NOT_EXISTS = "指定されたFFmpegパスが存在しません。システムPATHのFFmpegを使用します"
     MSG_SETTINGS_SAVED = "設定を保存しました"
     MSG_SETTINGS_SAVE_FAILED = "設定の保存に失敗しました"
+    COPY_COMMAND = "FFmpeg コマンドをコピー"
+    COPY_COMMAND_TOOLTIP = "現在の設定の FFmpeg コマンドをクリップボードにコピー（サンプルパスを使用）"
+    MSG_COMMAND_COPIED = "FFmpeg コマンドをクリップボードにコピーしました"
+    MSG_COMMAND_COPY_FAILED = "コマンドのコピーに失敗しました"
     
     # 進捗メッセージ形式
     PROGRESS_FORMAT = "全体進捗: {current}/{total} ファイル ({percent}%)"

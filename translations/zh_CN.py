@@ -114,6 +114,10 @@ class Translations:
         "如果系统PATH中没有FFmpeg，请在此处指定完整路径。"
     )
     BROWSE = "浏览..."
+    FFMPEG_DOWNLOAD_LINK = "下载 FFmpeg"
+    FFMPEG_IN_PATH_MSG = "FFmpeg 已添加到系统路径，无需设置。如有需要可指定其它版本。"
+    FFMPEG_NOT_IN_PATH_MSG = "FFmpeg 未添加到系统路径，请添加系统路径或手动指定路径。"
+    FFMPEG_MANUAL_PATH_MSG = "已手动指定 FFmpeg 路径。"
     
     # 视频编码参数
     VIDEO_ENCODING_PARAMS = "视频编码参数"
@@ -163,6 +167,14 @@ class Translations:
         "  - 1080p: 1920:1080\n"
         "  - 720p: 1280:720\n"
         "  - 480p: 854:480"
+    )
+    FRAMERATE = "帧率"
+    FRAMERATE_PLACEHOLDER = "例如: 30 或 29.97，留空保持原始帧率"
+    FRAMERATE_TOOLTIP = (
+        "视频帧率（fps）：\n"
+        "• 留空则保持原始帧率\n"
+        "• 格式：数字或小数，例如 30, 29.97, 24, 60\n"
+        "• 常用帧率：24（电影）、30（NTSC）、29.97（NTSC标准）、60（高帧率）"
     )
     
     # 音频编码参数
@@ -235,6 +247,8 @@ class Translations:
         "• 这些参数会追加到自动生成的FFmpeg命令末尾\n"
         "• 仅在未启用自定义命令时有效"
     )
+    COPY_COMMAND = "复制 FFmpeg 命令"
+    COPY_COMMAND_TOOLTIP = "复制当前设置的 FFmpeg 命令到剪贴板（使用示例路径）"
     
     # 提示音设置
     NOTIFICATION_SETTINGS = "提示音设置"
@@ -254,6 +268,8 @@ class Translations:
     MSG_FFMPEG_PATH_NOT_EXISTS = "指定的FFmpeg路径不存在，将尝试使用系统PATH中的FFmpeg"
     MSG_SETTINGS_SAVED = "设置已保存"
     MSG_SETTINGS_SAVE_FAILED = "保存设置失败"
+    MSG_COMMAND_COPIED = "FFmpeg 命令已复制到剪贴板"
+    MSG_COMMAND_COPY_FAILED = "复制命令失败"
     
     # 进度消息格式
     PROGRESS_FORMAT = "总体进度: {current}/{total} 个文件 ({percent}%)"

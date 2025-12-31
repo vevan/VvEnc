@@ -210,6 +210,7 @@ class FFmpegHandler:
         video_crf: str = "23",
         video_resolution: str = "",
         video_bit_depth: str = "8",
+        video_framerate: str = "",
         audio_codec: str = "copy",
         audio_bitrate: str = "",
         subtitle_mode: str = "copy",
@@ -262,18 +263,24 @@ class FFmpegHandler:
                         # NVenc H.264/HEVC 10bit使用p010le
                         pix_fmt_value = "p010le"
                 
-                # 处理分辨率和像素格式
-                if video_resolution or pix_fmt_value:
+                # 处理分辨率、像素格式和帧率
+                if video_resolution or pix_fmt_value or video_framerate:
                     vf_filters = []
                     if video_resolution:
                         vf_filters.append(f"scale={video_resolution}")
                     if pix_fmt_value:
                         vf_filters.append(f"format={pix_fmt_value}")
+                    if video_framerate:
+                        vf_filters.append(f"fps={video_framerate}")
                     if vf_filters:
                         cmd.extend(["-vf", ",".join(vf_filters)])
                 elif pix_fmt_value:
-                    # 只有像素格式，没有分辨率
+                    # 只有像素格式，没有分辨率和帧率
                     cmd.extend(["-pix_fmt", pix_fmt_value])
+                
+                # 如果只有帧率，没有分辨率和像素格式，使用 -r 参数
+                if video_framerate and not video_resolution and not pix_fmt_value:
+                    cmd.extend(["-r", video_framerate])
         
         # 音频编码参数
         if audio_codec:
