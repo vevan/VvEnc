@@ -2,7 +2,7 @@
 
 A batch video encoding tool based on PyQt5 and FFmpeg, supporting drag & drop, batch processing, directory structure preservation, multi-language UI, and more.
 
-> Note: This project is developed with the help of AI under the author's supervision, mainly for the author's personal needs. Feature requests are welcome but may not always be accepted.
+> Note: This project is developed with the help of AI under the author's supervision, mainly for the author's personal needs by the author for the author. Feature requests are welcome but may not always be accepted.
 
 ## ✨ Features
 
@@ -17,7 +17,7 @@ A batch video encoding tool based on PyQt5 and FFmpeg, supporting drag & drop, b
 - **File info loading dialog**: Progress dialog when loading a large number of files
 - **Context menu**: Open source file, reveal in folder, change task status
 - **Notification sound**: Optional custom sound when the queue finishes
-- **Configuration memory**: Remembers window size, encoding options, last used directory, etc.
+- **Configuration memory**: Remembers window size, window position, encoding options, last used directory, etc.
 
 ## 🚀 Quick Start
 
@@ -81,9 +81,9 @@ A batch video encoding tool based on PyQt5 and FFmpeg, supporting drag & drop, b
 The application automatically saves settings to `config.json`, including:
 
 - **FFmpeg path**: If FFmpeg is not in `PATH`, you can specify it manually
-- **Encoding options**: Video codec, CRF, preset, resolution, bit depth, etc.
+- **Encoding options**: Video codec, CRF, preset, resolution, framerate, bit depth, etc.
 - **Audio options**: Audio codec, bitrate, fallback audio codec/bitrate
-- **Window settings**: Window size, table column widths and order
+- **Window settings**: Window size, window position, table column widths and order
 - **Other settings**: Language, notification sound, last used directory, etc.
 
 ## 🔐 Code Signing & Security Notice
@@ -93,6 +93,60 @@ The application automatically saves settings to `config.json`, including:
   - Please make sure you downloaded the program from the official GitHub release page;
   - Click "More info" → "Run anyway" if you trust the source.
 - This project is fully open source. If you are concerned about security, you are encouraged to build the executable yourself from source.
+
+### Platform Support
+
+- **Windows**: Primary development and testing platform, fully functional and stable.
+- **Linux/macOS**: Built automatically by GitHub Actions, but not tested by the author. There may be unknown issues. Use at your own risk. The author is not responsible for issues on these platforms.
+
+## 🛠️ Building Executable
+
+Use `build_exe.bat` to build a standalone Windows executable:
+
+```bash
+build_exe.bat
+```
+
+After building, the executable will be located at `dist\VvEnc.exe`.
+
+**Note**: The `version` file will be automatically included during packaging to ensure the version number is correctly displayed in the settings page.
+
+For detailed instructions, see [Building Executable](package_en.md).
+
+## 🎯 Key Features Explained
+
+### Task Status Management
+
+- **Waiting** (light yellow): Newly added files waiting to be processed
+- **Encoding** (light blue): Currently encoding file
+- **Completed** (light green): Successfully encoded files
+- **Failed** (light red): Files that failed to encode
+- **Paused** (light purple): Manually set to paused, will be skipped in subsequent runs
+
+### Encoding Parameter Configuration
+
+- **Video codec**: libx264, libx265, NVENC, AV1, etc.
+- **CRF quality**: Controls output quality (recommended 18-28)
+- **Encoding preset**: Controls encoding speed (ultrafast to veryslow)
+- **Resolution**: Can specify output resolution (leave empty to keep original)
+- **Framerate**: Can specify output framerate (leave empty to keep original)
+- **Bit depth**: 8-bit or 10-bit
+- **Audio codec**: copy, aac, mp3, opus, etc.
+- **Fallback audio codec**: Automatically used when copy is not suitable for MP4 container
+
+### Advanced Features
+
+- **Windows taskbar progress**: Shows progress bar on taskbar icon during encoding
+- **Loading progress dialog**: Shows loading progress when adding a large number of files
+- **Context menu**:
+  - Open source file: Opens with system default program
+  - Reveal in folder: Opens file manager and selects the file
+  - Change task status: Set to waiting or paused
+- **Notification sound**: Optional custom audio file playback when queue finishes
+
+## 📝 Changelog
+
+See [CHANGELOG.md](../CHANGELOG.md) (if exists) for version update history.
 
 ## 📄 License
 
@@ -111,6 +165,10 @@ Pull requests and issue reports are welcome.
 - [FFmpeg Official Site](https://ffmpeg.org/)
 - [PyQt5 Documentation](https://www.riverbankcomputing.com/static/Docs/PyQt5/)
 - [GNU Official Site (GPL)](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
+---
+
+**Note**: This tool requires FFmpeg to be installed on your system. If FFmpeg is not in your system PATH, please manually specify the full path to FFmpeg in the application settings.
 
 
 
