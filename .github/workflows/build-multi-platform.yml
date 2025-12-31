@@ -209,13 +209,33 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+            # 手动触发时，使用输入参数或从 version 文件读取
+            if [ -n "${{ github.event.inputs.version }}" ] && [ "${{ github.event.inputs.version }}" != "dev" ]; then
+              VERSION="${{ github.event.inputs.version }}"
+            else
+              # 从 version 文件读取
+              if [ -f version ]; then
+                VERSION=$(cat version | tr -d '\r\n' | sed 's/^v//')
+              else
+                VERSION="dev"
+              fi
+            fi
+            # 保存带 v 前缀的版本号用于 release tag
+            if [ "$VERSION" != "dev" ]; then
+              TAG_NAME="v$VERSION"
+            else
+              TAG_NAME="dev"
+            fi
           else
+            # 从 tag 触发
             VERSION="${{ github.ref_name }}"
+            TAG_NAME="${{ github.ref_name }}"
           fi
           VERSION=$(echo $VERSION | sed 's/^v//')
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
       
       - name: Create release archive (Windows)
         if: matrix.os == 'windows-latest'
@@ -248,15 +268,16 @@ jobs:
             ${{ env.ARCHIVE_NAME }}
           retention-days: 30
       
-      - name: Create Release (on tag)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Create Release (on tag or manual trigger)
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && env.TAG_NAME != 'dev')
         uses: softprops/action-gh-release@v1
         with:
           files: |
             ${{ env.ARCHIVE_NAME }}
+          tag_name: ${{ env.TAG_NAME }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: ${{ matrix.os == 'windows-latest' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
