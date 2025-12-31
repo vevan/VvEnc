@@ -12,7 +12,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('core', 'core'), ('gui', 'gui'), ('translations', 'translations'), ('icon.ico', '.')],
+    datas=[('core', 'core'), ('gui', 'gui'), ('translations', 'translations'), ('version', '.'), ('icon.ico', '.')],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},

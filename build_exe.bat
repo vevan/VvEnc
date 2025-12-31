@@ -56,7 +56,7 @@ echo Cleanup complete
 
 echo.
 echo [4/5] Building executable...
-set ADD_DATA_PARAM=--add-data "core;core" --add-data "gui;gui" --add-data "translations;translations"
+set ADD_DATA_PARAM=--add-data "core;core" --add-data "gui;gui" --add-data "translations;translations" --add-data "version;."
 if exist icon.ico (
     set ADD_DATA_PARAM=%ADD_DATA_PARAM% --add-data "icon.ico;."
 )

@@ -96,6 +96,7 @@ jobs:
             "--add-data", "core;core",
             "--add-data", "gui;gui",
             "--add-data", "translations;translations",
+            "--add-data", "version;.",
             "--hidden-import=PyQt5.QtCore",
             "--hidden-import=PyQt5.QtGui",
             "--hidden-import=PyQt5.QtWidgets",
@@ -150,6 +151,7 @@ jobs:
             "--add-data" "core:core"
             "--add-data" "gui:gui"
             "--add-data" "translations:translations"
+            "--add-data" "version:."
             "--hidden-import=PyQt5.QtCore"
             "--hidden-import=PyQt5.QtGui"
             "--hidden-import=PyQt5.QtWidgets"

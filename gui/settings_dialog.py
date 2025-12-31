@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 import os
+import sys
 import subprocess
 import re
 from typing import Optional
@@ -37,7 +38,15 @@ class SettingsDialog(QDialog):
         """获取版本号（从 version 文件读取，格式统一为 v0.x.x）"""
         # 从 version 文件读取版本号（版本文件格式统一为带 v 前缀，如 v0.8.6）
         try:
-            version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "version")
+            # 处理 PyInstaller 打包后的路径
+            if getattr(sys, 'frozen', False):
+                # 打包后的可执行文件：从临时目录读取
+                base_path = sys._MEIPASS
+            else:
+                # 开发环境
+                base_path = os.path.dirname(os.path.dirname(__file__))
+            
+            version_file = os.path.join(base_path, "version")
             if os.path.exists(version_file):
                 with open(version_file, 'r', encoding='utf-8') as f:
                     version = f.read().strip()
