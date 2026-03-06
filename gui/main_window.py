@@ -544,11 +544,23 @@ class MainWindow(QMainWindow):
         
         self.start_btn = QPushButton(self.tr('START_ENCODING'))
         self.start_btn.clicked.connect(self.start_encoding)
+        self.start_btn.setStyleSheet("""
+            QPushButton { background-color: rgba(51,165,108,1); color: white; font-weight: bold; padding: 12px 24px; border-radius: 8px; }
+            QPushButton:hover { background-color: rgba(51,165,108,0.9); }
+            QPushButton:pressed { background-color: transparent; color: rgba(51,165,108,1); border: 1px solid rgba(51,165,108,1); }
+            QPushButton:disabled { background-color: rgba(51,165,108,0.5); }
+        """)
         control_layout.addWidget(self.start_btn)
         
         self.stop_btn = QPushButton(self.tr('STOP'))
         self.stop_btn.clicked.connect(self.stop_encoding)
         self.stop_btn.setEnabled(False)
+        self.stop_btn.setStyleSheet("""
+            QPushButton { background-color: rgba(218,40,42,1); color: white; font-weight: bold; padding: 12px 24px; border-radius: 8px; }
+            QPushButton:hover { background-color: rgba(218,40,42,0.9); }
+            QPushButton:pressed { background-color: transparent; color: rgba(218,40,42,1); border: 1px solid rgba(218,40,42,1); }
+            QPushButton:disabled { background-color: rgba(218,40,42,0.5); }
+        """)
         control_layout.addWidget(self.stop_btn)
         
         layout.addLayout(control_layout)
@@ -558,31 +570,54 @@ class MainWindow(QMainWindow):
     
     def dragEnterEvent(self, event: QDragEnterEvent):
         """拖放进入事件"""
-        if event.mimeData().hasUrls():
+        if event.mimeData().hasUrls() and not self._is_loading_file_info():
             event.acceptProposedAction()
     
     def dropEvent(self, event: QDropEvent):
         """拖放事件"""
+        if self._is_loading_file_info():
+            event.ignore()
+            return
         urls = event.mimeData().urls()
+        paths = []
         for url in urls:
             path = url.toLocalFile()
-            if os.path.exists(path):
-                self.add_path(path)
+            if path and os.path.exists(path):
+                paths.append(path)
+        if paths:
+            self.add_paths(paths)
         event.acceptProposedAction()
     
     def add_path(self, path: str):
         """添加路径（文件或文件夹）"""
+        self.add_paths([path])
+    
+    def add_paths(self, paths: list):
+        """批量添加路径（文件或文件夹），合并处理避免多个进度条冲突"""
+        if not paths:
+            return
         if not self.file_processor:
             QMessageBox.warning(self, self.tr('MSG_ERROR'), self.tr('MSG_FFMPEG_NOT_INIT'))
             return
         
-        files = self.file_processor.scan_files(path)
-        if not files:
+        # 合并扫描所有路径的文件
+        all_files = []
+        for path in paths:
+            files = self.file_processor.scan_files(path)
+            all_files.extend(files)
+        
+        if not all_files:
             QMessageBox.information(self, self.tr('MSG_INFO'), self.tr('MSG_NO_VIDEO_FILES'))
             return
         
-        # 过滤掉已存在的文件
-        new_files = [f for f in files if f not in self.file_list]
+        # 去重并过滤掉已存在的文件
+        seen = set()
+        new_files = []
+        for f in all_files:
+            if f not in self.file_list and f not in seen:
+                seen.add(f)
+                new_files.append(f)
+        
         if not new_files:
             return
         
@@ -597,11 +632,15 @@ class MainWindow(QMainWindow):
         if len(new_files) > 5:
             self._load_file_info_async(new_files)
         else:
-            # 文件数量少，直接同步加载
-            for file_path in new_files:
-                self._load_single_file_info(file_path)
-                # 处理事件，保持界面响应
-                QApplication.processEvents()
+            # 文件数量少，直接同步加载（加载期间同样禁用拖入和添加按钮，避免竞态）
+            self._set_file_info_loading_ui(True)
+            try:
+                for file_path in new_files:
+                    self._load_single_file_info(file_path)
+                    # 处理事件，保持界面响应
+                    QApplication.processEvents()
+            finally:
+                self._set_file_info_loading_ui(False)
         
         # 记录最后一个文件的目录路径到配置
         if new_files:
@@ -614,20 +653,37 @@ class MainWindow(QMainWindow):
         self.update_total_size_display()
         self.log(self.tr('LOG_FILES_ADDED').format(count=len(new_files)), "info")
     
+    def _is_loading_file_info(self) -> bool:
+        """是否正在加载文件信息"""
+        return self.file_info_worker is not None and self.file_info_worker.isRunning()
+    
+    def _set_file_info_loading_ui(self, loading: bool):
+        """设置加载期间的 UI 状态（禁用/恢复拖入和添加按钮）"""
+        self.setAcceptDrops(not loading)
+        self.add_files_btn.setEnabled(not loading)
+        self.add_folder_btn.setEnabled(not loading)
+    
     def _load_file_info_async(self, files: list):
         """异步加载文件信息（显示进度对话框）"""
-        # 创建并显示加载对话框
-        self.loading_dialog = LoadingDialog(self, tr_func=self.tr)
-        
-        # 创建工作线程
-        self.file_info_worker = FileInfoWorker(self.ffmpeg_handler, files)
-        self.file_info_worker.progress_updated.connect(self._on_file_info_progress)
-        self.file_info_worker.file_info_ready.connect(self._on_file_info_ready)
-        self.file_info_worker.finished.connect(self._on_file_info_finished)
-        
-        # 显示对话框并启动线程
-        self.loading_dialog.show()
-        self.file_info_worker.start()
+        self._set_file_info_loading_ui(True)
+        try:
+            # 创建并显示加载对话框
+            self.loading_dialog = LoadingDialog(self, tr_func=self.tr)
+            # 创建工作线程
+            self.file_info_worker = FileInfoWorker(self.ffmpeg_handler, files)
+            self.file_info_worker.progress_updated.connect(self._on_file_info_progress)
+            self.file_info_worker.file_info_ready.connect(self._on_file_info_ready)
+            self.file_info_worker.finished.connect(self._on_file_info_finished)
+            # 显示对话框并启动线程
+            self.loading_dialog.show()
+            self.file_info_worker.start()
+        except Exception:
+            self._set_file_info_loading_ui(False)
+            if self.loading_dialog:
+                self.loading_dialog.close()
+                self.loading_dialog = None
+            self.file_info_worker = None
+            raise
     
     def _load_single_file_info(self, file_path: str):
         """同步加载单个文件信息"""
@@ -688,6 +744,7 @@ class MainWindow(QMainWindow):
             self.loading_dialog.close()
             self.loading_dialog = None
         self.file_info_worker = None
+        self._set_file_info_loading_ui(False)
     
     def add_files(self):
         """添加文件"""
@@ -702,8 +759,8 @@ class MainWindow(QMainWindow):
             last_dir,
             self.tr('VIDEO_FILES_FILTER')
         )
-        for file_path in files:
-            self.add_path(file_path)
+        if files:
+            self.add_paths(files)
     
     def add_folder(self):
         """添加文件夹"""
@@ -841,17 +898,14 @@ class MainWindow(QMainWindow):
         return f"{size_bytes:.2f} PB"
     
     def format_bitrate(self, bitrate: int) -> str:
-        """格式化码率（统一使用Mbps）"""
+        """格式化码率（根据量级在 Kbps 与 Mbps 间切换，视频常用 Mbps，音频常用 Kbps）"""
         if bitrate == 0:
             return "N/A"
-        # 统一转换为Mbps显示
         mbps = bitrate / 1000000.0
-        if mbps < 0.01:
-            # 如果小于0.01 Mbps，显示Kbps
-            kbps = bitrate / 1000.0
-            return f"{kbps:.2f} Kbps"
-        else:
-            return f"{mbps:.2f} Mbps"
+        if mbps < 1:
+            kbps = int(round(bitrate / 1000.0))
+            return f"{kbps} Kbps"
+        return f"{mbps:.2f} Mbps"
     
     def calculate_total_size(self) -> int:
         """计算列表中所有文件的总大小（字节）"""
